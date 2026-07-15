@@ -7,11 +7,15 @@ import {
     UserPlus, Search, LogOut,
     Settings, User, ChevronDown,
     Loader, AlertCircle, Pill, DollarSign, Stethoscope,
-    Eye, Clock, RefreshCw, X, Home, HelpCircle
+    Eye, Clock, RefreshCw, X, Home, HelpCircle, Heart,
+    Package, ShoppingBag, ClipboardList
 } from 'lucide-react';
 import Sidebar from '../../components/Sidebar';
 import SidebarOverlay from '../../components/SidebarOverlay';
 import { supabase } from '../../services/supabaseClient';
+
+// ===== ACTIVITY ICON COMPONENT =====
+const ActivityIcon = Activity;
 
 const AdminDashboard = () => {
     const { user, signOut, loading } = useAuth();
@@ -34,6 +38,7 @@ const AdminDashboard = () => {
     const [activityFilter, setActivityFilter] = useState('all');
     const [activitySearch, setActivitySearch] = useState('');
     const [activityLoading, setActivityLoading] = useState(false);
+    const [activityError, setActivityError] = useState(null);
 
     // ===== REAL DATA STATE =====
     const [statsData, setStatsData] = useState({
@@ -44,7 +49,11 @@ const AdminDashboard = () => {
         bedDetails: '0 / 0 beds in use',
         totalDoctors: 0,
         totalRevenue: 0,
-        totalStaff: 0
+        totalStaff: 0,
+        totalVitals: 0,
+        totalInvoices: 0,
+        totalInventory: 0,
+        lowStockItems: 0
     });
     const [activities, setActivities] = useState([]);
 
@@ -59,22 +68,30 @@ const AdminDashboard = () => {
     // ============================================================
     const timeAgo = (timestamp) => {
         if (!timestamp) return 'Just now';
-        const now = new Date();
-        const then = new Date(timestamp);
-        const diff = Math.floor((now - then) / 1000);
-        if (diff < 60) return `${diff} sec ago`;
-        if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
-        if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-        if (diff < 604800) return `${Math.floor(diff / 86400)} days ago`;
-        return `${Math.floor(diff / 86400)} days ago`;
+        try {
+            const now = new Date();
+            const then = new Date(timestamp);
+            const diff = Math.floor((now - then) / 1000);
+            if (diff < 60) return `${diff} sec ago`;
+            if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
+            if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+            if (diff < 604800) return `${Math.floor(diff / 86400)} days ago`;
+            return `${Math.floor(diff / 86400)} days ago`;
+        } catch {
+            return 'Just now';
+        }
     };
 
     const formatDate = (timestamp) => {
         if (!timestamp) return 'N/A';
-        return new Date(timestamp).toLocaleString('en-US', {
-            dateStyle: 'medium',
-            timeStyle: 'short'
-        });
+        try {
+            return new Date(timestamp).toLocaleString('en-US', {
+                dateStyle: 'medium',
+                timeStyle: 'short'
+            });
+        } catch {
+            return 'N/A';
+        }
     };
 
     // ============================================================
@@ -82,153 +99,306 @@ const AdminDashboard = () => {
     // ============================================================
     const fetchAllActivities = async () => {
         setActivityLoading(true);
+        setActivityError(null);
         try {
             console.log('🔄 Fetching all activities...');
             const activitiesList = [];
+            let hasData = false;
 
-            // ===== 1. PATIENTS =====
-            const { data: patients } = await supabase
-                .from('patients')
-                .select('id, name, phone, created_at')
-                .order('created_at', { ascending: false })
-                .limit(20);
+            // ===== 1. TRY PATIENTS =====
+            try {
+                const { data: patients, error: pError } = await supabase
+                    .from('patients')
+                    .select('id, name, phone, created_at')
+                    .order('created_at', { ascending: false })
+                    .limit(20);
 
-            if (patients) {
-                patients.forEach(p => {
-                    activitiesList.push({
-                        id: `patient-${p.id}`,
+                if (!pError && patients && patients.length > 0) {
+                    hasData = true;
+                    patients.forEach(p => {
+                        activitiesList.push({
+                            id: `patient-${p.id}`,
+                            type: 'patient',
+                            title: 'New Patient Registered',
+                            description: `${p.name || 'Unknown'} was added to the system`,
+                            details: p.phone ? `Phone: ${p.phone}` : '',
+                            timestamp: p.created_at || new Date().toISOString(),
+                            timeAgo: timeAgo(p.created_at),
+                            color: '#2563EB',
+                            icon: User,
+                            link: '/patients',
+                            patientId: p.id
+                        });
+                    });
+                }
+            } catch (e) {
+                console.log('Patients table may not exist:', e.message);
+            }
+
+            // ===== 2. TRY APPOINTMENTS =====
+            try {
+                const { data: appointments, error: aError } = await supabase
+                    .from('appointments')
+                    .select(`
+                        id,
+                        appointment_date,
+                        time_slot,
+                        status,
+                        created_at
+                    `)
+                    .order('created_at', { ascending: false })
+                    .limit(20);
+
+                if (!aError && appointments && appointments.length > 0) {
+                    hasData = true;
+                    appointments.forEach(a => {
+                        activitiesList.push({
+                            id: `appointment-${a.id}`,
+                            type: 'appointment',
+                            title: 'Appointment Scheduled',
+                            description: `Appointment on ${a.appointment_date || 'N/A'}`,
+                            details: `${a.appointment_date || 'N/A'} at ${a.time_slot || 'N/A'} • Status: ${a.status || 'Scheduled'}`,
+                            timestamp: a.created_at || new Date().toISOString(),
+                            timeAgo: timeAgo(a.created_at),
+                            color: '#22C55E',
+                            icon: Calendar,
+                            link: '/appointments'
+                        });
+                    });
+                }
+            } catch (e) {
+                console.log('Appointments table may not exist:', e.message);
+            }
+
+            // ===== 3. TRY PRESCRIPTIONS =====
+            try {
+                const { data: prescriptions, error: pError } = await supabase
+                    .from('prescriptions')
+                    .select('id, medications, diagnosis, created_at')
+                    .order('created_at', { ascending: false })
+                    .limit(20);
+
+                if (!pError && prescriptions && prescriptions.length > 0) {
+                    hasData = true;
+                    prescriptions.forEach(p => {
+                        const medShort = p.medications?.substring(0, 40) || 'No medications';
+                        activitiesList.push({
+                            id: `prescription-${p.id}`,
+                            type: 'prescription',
+                            title: 'New Prescription Issued',
+                            description: `Prescription #${p.id?.substring(0, 8) || 'N/A'}`,
+                            details: `Medications: ${medShort}${p.medications?.length > 40 ? '...' : ''}`,
+                            timestamp: p.created_at || new Date().toISOString(),
+                            timeAgo: timeAgo(p.created_at),
+                            color: '#8B5CF6',
+                            icon: Pill,
+                            link: '/prescriptions'
+                        });
+                    });
+                }
+            } catch (e) {
+                console.log('Prescriptions table may not exist:', e.message);
+            }
+
+            // ===== 4. TRY DOCTORS =====
+            try {
+                const { data: doctors, error: dError } = await supabase
+                    .from('doctors')
+                    .select('id, name, specialization, created_at')
+                    .order('created_at', { ascending: false })
+                    .limit(10);
+
+                if (!dError && doctors && doctors.length > 0) {
+                    hasData = true;
+                    doctors.forEach(d => {
+                        activitiesList.push({
+                            id: `doctor-${d.id}`,
+                            type: 'doctor',
+                            title: 'New Doctor Added',
+                            description: `Dr. ${d.name || 'Unknown'} joined the team`,
+                            details: d.specialization ? `Specialization: ${d.specialization}` : '',
+                            timestamp: d.created_at || new Date().toISOString(),
+                            timeAgo: timeAgo(d.created_at),
+                            color: '#EC4899',
+                            icon: Stethoscope,
+                            link: '/doctors'
+                        });
+                    });
+                }
+            } catch (e) {
+                console.log('Doctors table may not exist:', e.message);
+            }
+
+            // ===== 5. TRY STAFF =====
+            try {
+                const { data: staff, error: sError } = await supabase
+                    .from('staff')
+                    .select('id, name, role, created_at')
+                    .order('created_at', { ascending: false })
+                    .limit(10);
+
+                if (!sError && staff && staff.length > 0) {
+                    hasData = true;
+                    staff.forEach(s => {
+                        activitiesList.push({
+                            id: `staff-${s.id}`,
+                            type: 'staff',
+                            title: 'New Staff Member Added',
+                            description: `${s.name || 'Unknown'} joined as ${s.role || 'Staff'}`,
+                            details: `Role: ${s.role || 'Staff'}`,
+                            timestamp: s.created_at || new Date().toISOString(),
+                            timeAgo: timeAgo(s.created_at),
+                            color: '#F59E0B',
+                            icon: User,
+                            link: '/staff'
+                        });
+                    });
+                }
+            } catch (e) {
+                console.log('Staff table may not exist:', e.message);
+            }
+
+            // ===== 6. TRY VITALS =====
+            try {
+                const { data: vitals, error: vError } = await supabase
+                    .from('vitals')
+                    .select(`
+                        id,
+                        patient_id,
+                        recorded_at,
+                        created_at,
+                        patients:patient_id (name)
+                    `)
+                    .order('created_at', { ascending: false })
+                    .limit(10);
+
+                if (!vError && vitals && vitals.length > 0) {
+                    hasData = true;
+                    vitals.forEach(v => {
+                        const patientName = v.patients?.name || 'Unknown Patient';
+                        activitiesList.push({
+                            id: `vital-${v.id}`,
+                            type: 'vital',
+                            title: 'Vital Signs Recorded',
+                            description: `Vitals recorded for ${patientName}`,
+                            details: `Recorded on ${new Date(v.recorded_at).toLocaleDateString()}`,
+                            timestamp: v.created_at || new Date().toISOString(),
+                            timeAgo: timeAgo(v.created_at),
+                            color: '#EF4444',
+                            icon: Heart,
+                            link: '/vitals'
+                        });
+                    });
+                }
+            } catch (e) {
+                console.log('Vitals table may not exist:', e.message);
+            }
+
+            // ===== 7. TRY INVOICES =====
+            try {
+                const { data: invoices, error: iError } = await supabase
+                    .from('invoices')
+                    .select('id, invoice_number, total, status, created_at, patients:patient_id(name)')
+                    .order('created_at', { ascending: false })
+                    .limit(10);
+
+                if (!iError && invoices && invoices.length > 0) {
+                    hasData = true;
+                    invoices.forEach(inv => {
+                        const patientName = inv.patients?.name || 'Unknown';
+                        activitiesList.push({
+                            id: `invoice-${inv.id}`,
+                            type: 'invoice',
+                            title: 'New Invoice Generated',
+                            description: `Invoice ${inv.invoice_number} for ${patientName}`,
+                            details: `Amount: Rs. ${parseFloat(inv.total).toFixed(2)} • Status: ${inv.status || 'pending'}`,
+                            timestamp: inv.created_at || new Date().toISOString(),
+                            timeAgo: timeAgo(inv.created_at),
+                            color: '#10B981',
+                            icon: DollarSign,
+                            link: '/billing'
+                        });
+                    });
+                }
+            } catch (e) {
+                console.log('Invoices table may not exist:', e.message);
+            }
+
+            // ===== IF NO DATA FOUND, ADD SAMPLE ACTIVITIES =====
+            if (!hasData || activitiesList.length === 0) {
+                console.log('No real data found, adding sample activities...');
+                const sampleActivities = [
+                    {
+                        id: 'sample-1',
                         type: 'patient',
-                        title: 'New Patient Registered',
-                        description: `${p.name} was added to the system`,
-                        details: p.phone ? `Phone: ${p.phone}` : '',
-                        timestamp: p.created_at,
-                        timeAgo: timeAgo(p.created_at),
+                        title: 'Welcome to Admin Dashboard',
+                        description: 'Start adding patients, appointments, and more',
+                        details: 'Click on Quick Actions to get started',
+                        timestamp: new Date().toISOString(),
+                        timeAgo: 'Just now',
                         color: '#2563EB',
                         icon: User,
-                        link: `/patients/${p.id}`
-                    });
-                });
-            }
-
-            // ===== 2. APPOINTMENTS =====
-            const { data: appointments } = await supabase
-                .from('appointments')
-                .select(`
-                    id,
-                    appointment_date,
-                    time_slot,
-                    status,
-                    created_at,
-                    patients (name),
-                    doctors (name)
-                `)
-                .order('created_at', { ascending: false })
-                .limit(20);
-
-            if (appointments) {
-                appointments.forEach(a => {
-                    const patientName = a.patients?.name || 'Unknown Patient';
-                    const doctorName = a.doctors?.name || 'Unknown Doctor';
-                    activitiesList.push({
-                        id: `appointment-${a.id}`,
+                        link: '/patients/add'
+                    },
+                    {
+                        id: 'sample-2',
                         type: 'appointment',
-                        title: 'Appointment Scheduled',
-                        description: `${patientName} booked with Dr. ${doctorName}`,
-                        details: `${a.appointment_date} at ${a.time_slot} • Status: ${a.status || 'Scheduled'}`,
-                        timestamp: a.created_at,
-                        timeAgo: timeAgo(a.created_at),
+                        title: 'Get Started',
+                        description: 'Schedule your first appointment',
+                        details: 'Go to Appointments to manage schedules',
+                        timestamp: new Date(Date.now() - 3600000).toISOString(),
+                        timeAgo: '1 hour ago',
                         color: '#22C55E',
                         icon: Calendar,
-                        link: `/appointments`
-                    });
-                });
-            }
-
-            // ===== 3. PRESCRIPTIONS =====
-            const { data: prescriptions } = await supabase
-                .from('prescriptions')
-                .select(`
-                    id,
-                    medications,
-                    diagnosis,
-                    created_at,
-                    patients (name),
-                    doctors (name)
-                `)
-                .order('created_at', { ascending: false })
-                .limit(20);
-
-            if (prescriptions) {
-                prescriptions.forEach(p => {
-                    const patientName = p.patients?.name || 'Unknown Patient';
-                    const doctorName = p.doctors?.name || 'Unknown Doctor';
-                    const medShort = p.medications?.substring(0, 40) || 'No medications';
-                    activitiesList.push({
-                        id: `prescription-${p.id}`,
+                        link: '/appointments'
+                    },
+                    {
+                        id: 'sample-3',
                         type: 'prescription',
-                        title: 'New Prescription Issued',
-                        description: `For ${patientName} by Dr. ${doctorName}`,
-                        details: `Medications: ${medShort}${p.medications?.length > 40 ? '...' : ''}`,
-                        timestamp: p.created_at,
-                        timeAgo: timeAgo(p.created_at),
+                        title: 'Create Prescriptions',
+                        description: 'Start issuing prescriptions to patients',
+                        details: 'Visit the Prescriptions section',
+                        timestamp: new Date(Date.now() - 7200000).toISOString(),
+                        timeAgo: '2 hours ago',
                         color: '#8B5CF6',
                         icon: Pill,
-                        link: `/prescriptions`
-                    });
-                });
-            }
-
-            // ===== 4. DOCTORS =====
-            const { data: doctors } = await supabase
-                .from('doctors')
-                .select('id, name, specialization, created_at')
-                .order('created_at', { ascending: false })
-                .limit(10);
-
-            if (doctors) {
-                doctors.forEach(d => {
-                    activitiesList.push({
-                        id: `doctor-${d.id}`,
-                        type: 'doctor',
-                        title: 'New Doctor Added',
-                        description: `Dr. ${d.name} joined the team`,
-                        details: d.specialization ? `Specialization: ${d.specialization}` : '',
-                        timestamp: d.created_at,
-                        timeAgo: timeAgo(d.created_at),
-                        color: '#EC4899',
-                        icon: Stethoscope,
-                        link: `/doctors`
-                    });
-                });
-            }
-
-            // ===== 5. STAFF =====
-            const { data: staff } = await supabase
-                .from('staff')
-                .select('id, name, role, created_at')
-                .order('created_at', { ascending: false })
-                .limit(10);
-
-            if (staff) {
-                staff.forEach(s => {
-                    activitiesList.push({
-                        id: `staff-${s.id}`,
-                        type: 'staff',
-                        title: 'New Staff Member Added',
-                        description: `${s.name} joined as ${s.role || 'Staff'}`,
-                        details: `Role: ${s.role || 'Staff'}`,
-                        timestamp: s.created_at,
-                        timeAgo: timeAgo(s.created_at),
-                        color: '#F59E0B',
-                        icon: User,
-                        link: `/staff`
-                    });
-                });
+                        link: '/prescriptions'
+                    },
+                    {
+                        id: 'sample-4',
+                        type: 'vital',
+                        title: 'Record Vital Signs',
+                        description: 'Track patient vital signs',
+                        details: 'Visit the Vital Signs section',
+                        timestamp: new Date(Date.now() - 10800000).toISOString(),
+                        timeAgo: '3 hours ago',
+                        color: '#EF4444',
+                        icon: Heart,
+                        link: '/vitals'
+                    },
+                    {
+                        id: 'sample-5',
+                        type: 'invoice',
+                        title: 'Billing & Invoices',
+                        description: 'Generate invoices for patients',
+                        details: 'Visit the Billing section',
+                        timestamp: new Date(Date.now() - 14400000).toISOString(),
+                        timeAgo: '4 hours ago',
+                        color: '#10B981',
+                        icon: DollarSign,
+                        link: '/billing'
+                    }
+                ];
+                activitiesList.push(...sampleActivities);
             }
 
             // Sort by timestamp (newest first)
             activitiesList.sort((a, b) => {
-                return new Date(b.timestamp) - new Date(a.timestamp);
+                try {
+                    return new Date(b.timestamp) - new Date(a.timestamp);
+                } catch {
+                    return 0;
+                }
             });
 
             setAllActivities(activitiesList);
@@ -236,9 +406,39 @@ const AdminDashboard = () => {
 
         } catch (err) {
             console.error('❌ Error fetching activities:', err);
+            setActivityError('Failed to load activities. Please try again.');
+            setAllActivities([
+                {
+                    id: 'fallback-1',
+                    type: 'system',
+                    title: 'System Ready',
+                    description: 'Dashboard is ready for use',
+                    details: 'Start managing your hospital efficiently',
+                    timestamp: new Date().toISOString(),
+                    timeAgo: 'Just now',
+                    color: '#2563EB',
+                    icon: ActivityIcon,
+                    link: '/dashboard'
+                }
+            ]);
         } finally {
             setActivityLoading(false);
         }
+    };
+
+    // ============================================================
+    // ===== HANDLE ACTIVITY CLICK =====
+    // ============================================================
+    const handleActivityClick = (activity) => {
+        if (!activity.link) return;
+
+        setShowActivityView(false);
+        setAllActivities([]);
+        setActivityError(null);
+
+        setTimeout(() => {
+            navigate(activity.link);
+        }, 200);
     };
 
     // ============================================================
@@ -250,133 +450,279 @@ const AdminDashboard = () => {
         try {
             console.log('🔄 Fetching admin dashboard data...');
 
+            let activePatients = 0;
+            let todayAppointments = 0;
+            let totalPrescriptions = 0;
+            let totalBeds = 0;
+            let occupiedBeds = 0;
+            let totalDoctors = 0;
+            let staffCount = 0;
+            let totalVitals = 0;
+            let totalInvoices = 0;
+            let totalInventory = 0;
+            let lowStockItems = 0;
+
             // ===== 1. GET PATIENTS COUNT =====
-            const { count: totalPatients } = await supabase
-                .from('patients')
-                .select('*', { count: 'exact', head: true });
+            try {
+                const { count } = await supabase
+                    .from('patients')
+                    .select('*', { count: 'exact', head: true });
+                activePatients = count || 0;
+            } catch (e) {
+                console.log('Patients table may not exist:', e.message);
+            }
 
             // ===== 2. GET TODAY'S APPOINTMENTS =====
-            const today = new Date().toISOString().split('T')[0];
-            const { count: todayAppointments } = await supabase
-                .from('appointments')
-                .select('*', { count: 'exact', head: true })
-                .eq('appointment_date', today);
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                const { count } = await supabase
+                    .from('appointments')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('appointment_date', today);
+                todayAppointments = count || 0;
+            } catch (e) {
+                console.log('Appointments table may not exist:', e.message);
+            }
 
             // ===== 3. GET TOTAL PRESCRIPTIONS =====
-            const { count: totalPrescriptions } = await supabase
-                .from('prescriptions')
-                .select('*', { count: 'exact', head: true });
+            try {
+                const { count } = await supabase
+                    .from('prescriptions')
+                    .select('*', { count: 'exact', head: true });
+                totalPrescriptions = count || 0;
+            } catch (e) {
+                console.log('Prescriptions table may not exist:', e.message);
+            }
 
             // ===== 4. GET BED OCCUPANCY =====
-            const { data: beds } = await supabase
-                .from('beds')
-                .select('*');
-
-            const totalBeds = beds?.length || 0;
-            const occupiedBeds = beds?.filter(b => b.status === 'occupied' || b.status === 'Occupied').length || 0;
-            const bedOccupancy = totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0;
+            try {
+                const { data: beds } = await supabase
+                    .from('beds')
+                    .select('*');
+                if (beds) {
+                    totalBeds = beds.length;
+                    occupiedBeds = beds.filter(b => b.status === 'occupied' || b.status === 'Occupied').length;
+                }
+            } catch (e) {
+                console.log('Beds table may not exist:', e.message);
+            }
 
             // ===== 5. GET DOCTORS COUNT =====
-            const { count: totalDoctors } = await supabase
-                .from('doctors')
-                .select('*', { count: 'exact', head: true });
-
-            // ===== 6. GET STAFF COUNT (FROM STAFF TABLE) =====
-            const { count: staffCount } = await supabase
-                .from('staff')
-                .select('*', { count: 'exact', head: true });
-
-            // ===== 7. GET TOTAL STAFF = Staff + Doctors =====
-            const totalStaff = (staffCount || 0) + (totalDoctors || 0);
-            console.log('📊 Staff count:', staffCount);
-            console.log('📊 Doctors count:', totalDoctors);
-            console.log('📊 Total staff:', totalStaff);
-
-            // ===== 8. GET RECENT ACTIVITIES =====
-            const activitiesList = [];
-
-            // Recent patients
-            const { data: recentPatients } = await supabase
-                .from('patients')
-                .select('id, name, created_at')
-                .order('created_at', { ascending: false })
-                .limit(3);
-
-            if (recentPatients) {
-                recentPatients.forEach(p => {
-                    activitiesList.push({
-                        id: `patient-${p.id}`,
-                        text: `New patient registered: <strong>${p.name}</strong>`,
-                        time: timeAgo(p.created_at),
-                        color: '#2563EB',
-                        type: 'patient'
-                    });
-                });
+            try {
+                const { count } = await supabase
+                    .from('doctors')
+                    .select('*', { count: 'exact', head: true });
+                totalDoctors = count || 0;
+            } catch (e) {
+                console.log('Doctors table may not exist:', e.message);
             }
 
-            // Recent prescriptions
-            const { data: recentPrescriptions } = await supabase
-                .from('prescriptions')
-                .select('id, medications, created_at')
-                .order('created_at', { ascending: false })
-                .limit(3);
-
-            if (recentPrescriptions) {
-                recentPrescriptions.forEach(p => {
-                    const medShort = p.medications?.substring(0, 30) || 'Medicine';
-                    activitiesList.push({
-                        id: `prescription-${p.id}`,
-                        text: `New prescription added: <strong>${medShort}...</strong>`,
-                        time: timeAgo(p.created_at),
-                        color: '#8B5CF6',
-                        type: 'prescription'
-                    });
-                });
+            // ===== 6. GET STAFF COUNT =====
+            try {
+                const { count } = await supabase
+                    .from('staff')
+                    .select('*', { count: 'exact', head: true });
+                staffCount = count || 0;
+            } catch (e) {
+                console.log('Staff table may not exist:', e.message);
             }
 
-            // Recent appointments
-            const { data: recentAppointments } = await supabase
-                .from('appointments')
-                .select(`
-                    id,
-                    appointment_date,
-                    time_slot,
-                    created_at,
-                    patients (name)
-                `)
-                .order('created_at', { ascending: false })
-                .limit(3);
-
-            if (recentAppointments) {
-                recentAppointments.forEach(a => {
-                    const patientName = a.patients?.name || 'Unknown';
-                    activitiesList.push({
-                        id: `appointment-${a.id}`,
-                        text: `Appointment scheduled for <strong>${patientName}</strong> on ${a.appointment_date}`,
-                        time: timeAgo(a.created_at),
-                        color: '#22C55E',
-                        type: 'appointment'
-                    });
-                });
+            // ===== 7. GET VITALS COUNT =====
+            try {
+                const { count } = await supabase
+                    .from('vitals')
+                    .select('*', { count: 'exact', head: true });
+                totalVitals = count || 0;
+            } catch (e) {
+                console.log('Vitals table may not exist:', e.message);
             }
 
-            // Sort by time (newest first)
-            activitiesList.sort((a, b) => {
-                const timeA = parseInt(a.time) || 0;
-                const timeB = parseInt(b.time) || 0;
-                return timeA - timeB;
-            });
+            // ===== 8. GET INVOICES COUNT =====
+            try {
+                const { count } = await supabase
+                    .from('invoices')
+                    .select('*', { count: 'exact', head: true });
+                totalInvoices = count || 0;
+            } catch (e) {
+                console.log('Invoices table may not exist:', e.message);
+            }
+
+            // ===== 9. GET INVENTORY COUNT =====
+            try {
+                const { data: inventory } = await supabase
+                    .from('inventory')
+                    .select('*');
+                if (inventory) {
+                    totalInventory = inventory.length;
+                    lowStockItems = inventory.filter(item =>
+                        item.quantity && item.quantity < (item.minimum_quantity || 10)
+                    ).length;
+                }
+            } catch (e) {
+                console.log('Inventory table may not exist:', e.message);
+            }
+
+            const totalStaff = staffCount + totalDoctors;
+            const bedOccupancy = totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0;
 
             setStatsData({
-                activePatients: totalPatients || 0,
+                activePatients: activePatients || 0,
                 todayAppointments: todayAppointments || 0,
                 totalPrescriptions: totalPrescriptions || 0,
                 bedOccupancy: totalBeds > 0 ? `${bedOccupancy}%` : '0%',
                 bedDetails: totalBeds > 0 ? `${occupiedBeds} / ${totalBeds} beds in use` : 'No beds available',
                 totalDoctors: totalDoctors || 0,
                 totalRevenue: 0,
-                totalStaff: totalStaff || 0
+                totalStaff: totalStaff || 0,
+                totalVitals: totalVitals || 0,
+                totalInvoices: totalInvoices || 0,
+                totalInventory: totalInventory || 0,
+                lowStockItems: lowStockItems || 0
             });
+
+            // ===== GET RECENT ACTIVITIES =====
+            const activitiesList = [];
+
+            // Recent patients
+            try {
+                const { data: recentPatients } = await supabase
+                    .from('patients')
+                    .select('id, name, created_at')
+                    .order('created_at', { ascending: false })
+                    .limit(3);
+
+                if (recentPatients) {
+                    recentPatients.forEach(p => {
+                        activitiesList.push({
+                            id: `patient-${p.id}`,
+                            text: `New patient registered: <strong>${p.name || 'Unknown'}</strong>`,
+                            time: timeAgo(p.created_at),
+                            color: '#2563EB',
+                            type: 'patient'
+                        });
+                    });
+                }
+            } catch (e) {
+                console.log('Could not fetch recent patients:', e.message);
+            }
+
+            // Recent prescriptions
+            try {
+                const { data: recentPrescriptions } = await supabase
+                    .from('prescriptions')
+                    .select('id, medications, created_at')
+                    .order('created_at', { ascending: false })
+                    .limit(3);
+
+                if (recentPrescriptions) {
+                    recentPrescriptions.forEach(p => {
+                        const medShort = p.medications?.substring(0, 30) || 'Medicine';
+                        activitiesList.push({
+                            id: `prescription-${p.id}`,
+                            text: `New prescription added: <strong>${medShort}...</strong>`,
+                            time: timeAgo(p.created_at),
+                            color: '#8B5CF6',
+                            type: 'prescription'
+                        });
+                    });
+                }
+            } catch (e) {
+                console.log('Could not fetch recent prescriptions:', e.message);
+            }
+
+            // Recent appointments
+            try {
+                const { data: recentAppointments } = await supabase
+                    .from('appointments')
+                    .select('id, appointment_date, time_slot, created_at')
+                    .order('created_at', { ascending: false })
+                    .limit(3);
+
+                if (recentAppointments) {
+                    recentAppointments.forEach(a => {
+                        activitiesList.push({
+                            id: `appointment-${a.id}`,
+                            text: `Appointment scheduled on <strong>${a.appointment_date || 'N/A'}</strong>`,
+                            time: timeAgo(a.created_at),
+                            color: '#22C55E',
+                            type: 'appointment'
+                        });
+                    });
+                }
+            } catch (e) {
+                console.log('Could not fetch recent appointments:', e.message);
+            }
+
+            // Recent vitals
+            try {
+                const { data: recentVitals } = await supabase
+                    .from('vitals')
+                    .select(`
+                        id,
+                        recorded_at,
+                        created_at,
+                        patients:patient_id (name)
+                    `)
+                    .order('created_at', { ascending: false })
+                    .limit(3);
+
+                if (recentVitals) {
+                    recentVitals.forEach(v => {
+                        const patientName = v.patients?.name || 'Unknown';
+                        activitiesList.push({
+                            id: `vital-${v.id}`,
+                            text: `Vitals recorded for <strong>${patientName}</strong>`,
+                            time: timeAgo(v.created_at),
+                            color: '#EF4444',
+                            type: 'vital'
+                        });
+                    });
+                }
+            } catch (e) {
+                console.log('Could not fetch recent vitals:', e.message);
+            }
+
+            // Recent invoices
+            try {
+                const { data: recentInvoices } = await supabase
+                    .from('invoices')
+                    .select('id, invoice_number, total, created_at, patients:patient_id(name)')
+                    .order('created_at', { ascending: false })
+                    .limit(3);
+
+                if (recentInvoices) {
+                    recentInvoices.forEach(inv => {
+                        const patientName = inv.patients?.name || 'Unknown';
+                        activitiesList.push({
+                            id: `invoice-${inv.id}`,
+                            text: `New invoice generated: <strong>${inv.invoice_number}</strong> for ${patientName}`,
+                            time: timeAgo(inv.created_at),
+                            color: '#10B981',
+                            type: 'invoice'
+                        });
+                    });
+                }
+            } catch (e) {
+                console.log('Could not fetch recent invoices:', e.message);
+            }
+
+            if (activitiesList.length === 0) {
+                activitiesList.push({
+                    id: 'welcome',
+                    text: 'Welcome to the Admin Dashboard! 🎉',
+                    time: 'Just now',
+                    color: '#2563EB',
+                    type: 'system'
+                });
+            }
+
+            // Sort by time
+            activitiesList.sort((a, b) => {
+                const timeA = parseInt(a.time) || 0;
+                const timeB = parseInt(b.time) || 0;
+                return timeA - timeB;
+            });
+
             setActivities(activitiesList.slice(0, 6));
 
         } catch (err) {
@@ -404,6 +750,12 @@ const AdminDashboard = () => {
         window.addEventListener('doctorChanged', handleDataChange);
         window.addEventListener('appointmentChanged', handleDataChange);
         window.addEventListener('prescriptionChanged', handleDataChange);
+        window.addEventListener('vitalAdded', handleDataChange);
+        window.addEventListener('vitalChanged', handleDataChange);
+        window.addEventListener('invoiceAdded', handleDataChange);
+        window.addEventListener('invoiceUpdated', handleDataChange);
+        window.addEventListener('invoiceDeleted', handleDataChange);
+        window.addEventListener('inventoryChanged', handleDataChange);
         return () => {
             window.removeEventListener('patientAdded', handleDataChange);
             window.removeEventListener('prescriptionAdded', handleDataChange);
@@ -413,6 +765,12 @@ const AdminDashboard = () => {
             window.removeEventListener('doctorChanged', handleDataChange);
             window.removeEventListener('appointmentChanged', handleDataChange);
             window.removeEventListener('prescriptionChanged', handleDataChange);
+            window.removeEventListener('vitalAdded', handleDataChange);
+            window.removeEventListener('vitalChanged', handleDataChange);
+            window.removeEventListener('invoiceAdded', handleDataChange);
+            window.removeEventListener('invoiceUpdated', handleDataChange);
+            window.removeEventListener('invoiceDeleted', handleDataChange);
+            window.removeEventListener('inventoryChanged', handleDataChange);
         };
     }, []);
 
@@ -496,7 +854,11 @@ const AdminDashboard = () => {
             'Total Prescriptions': '/prescriptions',
             'Bed Occupancy': '/beds',
             'Total Doctors': '/doctors',
-            'Total Staff': '/staff'
+            'Total Staff': '/staff',
+            'Total Vitals': '/vitals',
+            'Total Invoices': '/billing',
+            'Total Inventory': '/inventory',
+            'Low Stock Items': '/inventory'
         };
         navigate(routeMap[statName] || '/dashboard');
         closeSidebar();
@@ -527,9 +889,11 @@ const AdminDashboard = () => {
         setTimeout(() => fetchDashboardData(), 1000);
     };
 
+    // ===== FIXED: Vital Signs Handler =====
     const handleVitalSigns = () => {
         navigate('/vitals');
         closeSidebar();
+        setTimeout(() => fetchDashboardData(), 1000);
     };
 
     const handleManageDoctors = () => {
@@ -542,9 +906,32 @@ const AdminDashboard = () => {
         closeSidebar();
     };
 
+    // ===== FIXED: Generate Invoice Handler =====
     const handleGenerateInvoice = () => {
-        navigate('/invoices/generate');
+        navigate('/billing');
         closeSidebar();
+        setTimeout(() => fetchDashboardData(), 1000);
+    };
+
+    // ===== NEW: Billing Handler =====
+    const handleBilling = () => {
+        navigate('/billing');
+        closeSidebar();
+        setTimeout(() => fetchDashboardData(), 1000);
+    };
+
+    // ===== NEW: Inventory Handler =====
+    const handleInventory = () => {
+        navigate('/inventory');
+        closeSidebar();
+        setTimeout(() => fetchDashboardData(), 1000);
+    };
+
+    // ===== NEW: Pharmacy Handler =====
+    const handlePharmacy = () => {
+        navigate('/pharmacy');
+        closeSidebar();
+        setTimeout(() => fetchDashboardData(), 1000);
     };
 
     const handleOpenHandbook = () => {
@@ -552,14 +939,14 @@ const AdminDashboard = () => {
     };
 
     const handleViewAllActivity = async () => {
-        await fetchAllActivities();
         setShowActivityView(true);
-        closeSidebar();
+        await fetchAllActivities();
     };
 
     const closeActivityView = () => {
         setShowActivityView(false);
         setAllActivities([]);
+        setActivityError(null);
     };
 
     // ============================================================
@@ -584,7 +971,12 @@ const AdminDashboard = () => {
             appointment: 'Appointment',
             prescription: 'Prescription',
             doctor: 'Doctor',
-            staff: 'Staff'
+            staff: 'Staff',
+            vital: 'Vital Signs',
+            invoice: 'Invoice',
+            inventory: 'Inventory',
+            pharmacy: 'Pharmacy',
+            system: 'System'
         };
         return labels[type] || type;
     };
@@ -595,7 +987,10 @@ const AdminDashboard = () => {
         { value: 'appointment', label: 'Appointments' },
         { value: 'prescription', label: 'Prescriptions' },
         { value: 'doctor', label: 'Doctors' },
-        { value: 'staff', label: 'Staff' }
+        { value: 'staff', label: 'Staff' },
+        { value: 'vital', label: 'Vital Signs' },
+        { value: 'invoice', label: 'Invoices' },
+        { value: 'inventory', label: 'Inventory' }
     ];
 
     // ============================================================
@@ -654,6 +1049,34 @@ const AdminDashboard = () => {
             label: 'Total Staff',
             color: '#F59E0B',
             onClick: () => handleStatClick('Total Staff')
+        },
+        {
+            icon: Heart,
+            value: statsData.totalVitals,
+            label: 'Total Vitals',
+            color: '#EF4444',
+            onClick: () => handleStatClick('Total Vitals')
+        },
+        {
+            icon: DollarSign,
+            value: statsData.totalInvoices,
+            label: 'Total Invoices',
+            color: '#10B981',
+            onClick: () => handleStatClick('Total Invoices')
+        },
+        {
+            icon: Package,
+            value: statsData.totalInventory,
+            label: 'Total Inventory',
+            color: '#8B5CF6',
+            onClick: () => handleStatClick('Total Inventory')
+        },
+        {
+            icon: AlertCircle,
+            value: statsData.lowStockItems,
+            label: 'Low Stock Items',
+            color: '#EF4444',
+            onClick: () => handleStatClick('Low Stock Items')
         }
     ];
 
@@ -661,10 +1084,17 @@ const AdminDashboard = () => {
         { icon: UserPlus, label: 'Register Patient', color: '#2563EB', onClick: handleRegisterPatient },
         { icon: Calendar, label: 'Schedule Appointment', color: '#22C55E', onClick: handleScheduleAppointment },
         { icon: Pill, label: 'New Prescription', color: '#8B5CF6', onClick: handleNewPrescription },
-        { icon: Activity, label: 'Vital Signs', color: '#EF4444', onClick: handleVitalSigns },
+        { icon: Heart, label: 'Vital Signs', color: '#EF4444', onClick: handleVitalSigns },
         { icon: Stethoscope, label: 'Manage Doctors', color: '#EC4899', onClick: handleManageDoctors },
         { icon: Users, label: 'Manage Staff', color: '#F59E0B', onClick: handleManageStaff },
+        // ===== FIXED: Generate Invoice =====
         { icon: DollarSign, label: 'Generate Invoice', color: '#10B981', onClick: handleGenerateInvoice },
+        // ===== NEW: Billing =====
+        { icon: FileText, label: 'Billing', color: '#3B82F6', onClick: handleBilling },
+        // ===== NEW: Pharmacy =====
+        { icon: ShoppingBag, label: 'Pharmacy', color: '#8B5CF6', onClick: handlePharmacy },
+        // ===== NEW: Inventory =====
+        { icon: Package, label: 'Inventory', color: '#F59E0B', onClick: handleInventory },
         { icon: Eye, label: 'View All Activity', color: '#8B5CF6', onClick: handleViewAllActivity },
     ];
 
@@ -889,6 +1319,23 @@ const AdminDashboard = () => {
                                     </button>
                                 </div>
 
+                                {/* Error Message */}
+                                {activityError && (
+                                    <div style={{
+                                        padding: '10px 20px',
+                                        background: 'var(--danger-color)15',
+                                        borderBottom: '1px solid var(--danger-color)30',
+                                        color: 'var(--danger-color)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        fontSize: '0.85rem'
+                                    }}>
+                                        <AlertCircle size={18} />
+                                        <span>{activityError}</span>
+                                    </div>
+                                )}
+
                                 {/* Filters */}
                                 <div style={{
                                     padding: '12px 20px',
@@ -978,19 +1425,15 @@ const AdminDashboard = () => {
                                         <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
                                             <ActivityIcon size={40} style={{ color: 'var(--text-muted)' }} />
                                             <p style={{ marginTop: '12px' }}>No activities found</p>
+                                            <p style={{ fontSize: '0.75rem', marginTop: '4px' }}>Start adding patients, appointments, and more!</p>
                                         </div>
                                     ) : (
                                         filteredActivities.map((activity, index) => {
-                                            const Icon = activity.icon;
+                                            const Icon = activity.icon || ActivityIcon;
                                             return (
                                                 <div
-                                                    key={activity.id}
-                                                    onClick={() => {
-                                                        if (activity.link) {
-                                                            closeActivityView();
-                                                            setTimeout(() => navigate(activity.link), 300);
-                                                        }
-                                                    }}
+                                                    key={activity.id || index}
+                                                    onClick={() => handleActivityClick(activity)}
                                                     style={{
                                                         display: 'flex',
                                                         alignItems: 'flex-start',
@@ -1014,8 +1457,8 @@ const AdminDashboard = () => {
                                                         width: '36px',
                                                         height: '36px',
                                                         borderRadius: '8px',
-                                                        background: `${activity.color}15`,
-                                                        color: activity.color,
+                                                        background: `${activity.color || '#2563EB'}15`,
+                                                        color: activity.color || '#2563EB',
                                                         display: 'flex',
                                                         alignItems: 'center',
                                                         justifyContent: 'center',
@@ -1037,13 +1480,13 @@ const AdminDashboard = () => {
                                                                     fontWeight: 600,
                                                                     color: 'var(--text-primary)'
                                                                 }}>
-                                                                    {activity.title}
+                                                                    {activity.title || 'Activity'}
                                                                 </div>
                                                                 <div style={{
                                                                     fontSize: '0.75rem',
                                                                     color: 'var(--text-secondary)'
                                                                 }}>
-                                                                    {activity.description}
+                                                                    {activity.description || ''}
                                                                 </div>
                                                                 {activity.details && (
                                                                     <div style={{
@@ -1066,13 +1509,13 @@ const AdminDashboard = () => {
                                                                     fontSize: '0.55rem',
                                                                     padding: '2px 8px',
                                                                     borderRadius: '10px',
-                                                                    background: `${activity.color}15`,
-                                                                    color: activity.color,
+                                                                    background: `${activity.color || '#2563EB'}15`,
+                                                                    color: activity.color || '#2563EB',
                                                                     fontWeight: 500,
                                                                     textTransform: 'uppercase',
                                                                     letterSpacing: '0.3px'
                                                                 }}>
-                                                                    {getTypeLabel(activity.type)}
+                                                                    {getTypeLabel(activity.type) || 'Activity'}
                                                                 </span>
                                                                 <span style={{
                                                                     fontSize: '0.65rem',
@@ -1080,7 +1523,7 @@ const AdminDashboard = () => {
                                                                     whiteSpace: 'nowrap'
                                                                 }}>
                                                                     <Clock size={11} style={{ display: 'inline', marginRight: '3px' }} />
-                                                                    {activity.timeAgo}
+                                                                    {activity.timeAgo || 'Just now'}
                                                                 </span>
                                                             </div>
                                                         </div>
@@ -1123,6 +1566,9 @@ const AdminDashboard = () => {
                                 <span>🛏️ Beds: {statsData.bedDetails}</span>
                                 <span>👨‍⚕️ Doctors: {statsData.totalDoctors}</span>
                                 <span>👤 Staff: {statsData.totalStaff}</span>
+                                <span>❤️ Vitals: {statsData.totalVitals}</span>
+                                <span>💰 Invoices: {statsData.totalInvoices}</span>
+                                <span>📦 Inventory: {statsData.totalInventory}</span>
                             </div>
                         </div>
                     </div>
@@ -1301,10 +1747,12 @@ const AdminDashboard = () => {
                                             if (activity.type === 'patient') navigate('/patients');
                                             else if (activity.type === 'prescription') navigate('/prescriptions');
                                             else if (activity.type === 'appointment') navigate('/appointments');
+                                            else if (activity.type === 'vital') navigate('/vitals');
+                                            else if (activity.type === 'invoice') navigate('/billing');
                                         }}
                                     >
                                         <div className="activity-dot" style={{
-                                            backgroundColor: activity.color,
+                                            backgroundColor: activity.color || '#2563EB',
                                             width: '8px',
                                             height: '8px',
                                             borderRadius: '50%',
@@ -1312,11 +1760,11 @@ const AdminDashboard = () => {
                                         }} />
                                         <div className="activity-content" style={{ flex: 1 }}>
                                             <p className="activity-text" style={{ fontSize: '0.85rem', color: 'var(--text-primary)', margin: 0 }}>
-                                                <span dangerouslySetInnerHTML={{ __html: activity.text }} />
+                                                <span dangerouslySetInnerHTML={{ __html: activity.text || 'Activity' }} />
                                             </p>
                                             <div className="activity-time" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                                                 <Clock size={11} style={{ display: 'inline', marginRight: '4px' }} />
-                                                {activity.time}
+                                                {activity.time || 'Just now'}
                                             </div>
                                         </div>
                                     </div>
@@ -1451,7 +1899,6 @@ const AdminDashboard = () => {
             </div>
 
             <style jsx>{`
-                /* ===== DROPDOWN STYLES ===== */
                 .profile-dropdown {
                     position: relative;
                 }
@@ -1513,7 +1960,6 @@ const AdminDashboard = () => {
                     transform: rotate(180deg);
                 }
 
-                /* ===== DROPDOWN MENU ===== */
                 .dropdown-menu {
                     position: absolute;
                     top: calc(100% + 8px);
@@ -1614,7 +2060,6 @@ const AdminDashboard = () => {
                     color: var(--danger-color);
                 }
 
-                /* ===== RESPONSIVE ===== */
                 @media (max-width: 768px) {
                     .dashboard-two-col {
                         grid-template-columns: 1fr !important;

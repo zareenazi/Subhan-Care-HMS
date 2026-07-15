@@ -3,7 +3,7 @@ import {
     LayoutDashboard, Users, Stethoscope, Calendar,
     FileText, CreditCard, Package, Pill,
     BarChart3, UserCog, BookOpen, LogOut,
-    ChevronDown, Sun, Moon, X
+    ChevronDown, Sun, Moon, X, Activity
 } from 'lucide-react';
 
 const Sidebar = ({
@@ -14,7 +14,7 @@ const Sidebar = ({
     theme,
     toggleTheme,
     onClose,
-    isOpen  // ← IMPORTANT
+    isOpen
 }) => {
     const navSections = [
         {
@@ -29,7 +29,8 @@ const Sidebar = ({
                 { id: 'patients', icon: Users, label: 'Patients' },
                 { id: 'doctors', icon: Stethoscope, label: 'Doctors' },
                 { id: 'appointments', icon: Calendar, label: 'Appointments' },
-                { id: 'prescriptions', icon: FileText, label: 'Prescriptions' }
+                { id: 'prescriptions', icon: FileText, label: 'Prescriptions' },
+                { id: 'vitals', icon: Activity, label: 'Vitals' }  // ← ADDED VITALS
             ]
         },
         {
@@ -50,7 +51,7 @@ const Sidebar = ({
 
     const handleNavClick = (page) => {
         if (onNavigate) onNavigate(page);
-        if (onClose) onClose(); // Close sidebar on mobile after navigation
+        if (onClose) onClose();
     };
 
     return (

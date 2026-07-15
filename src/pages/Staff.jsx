@@ -28,6 +28,7 @@ const Staff = () => {
     const [departmentFilter, setDepartmentFilter] = useState('');
     const [showFilters, setShowFilters] = useState(false);
     const [totalStaff, setTotalStaff] = useState(0);
+    const [touched, setTouched] = useState({});
 
     // ===== STATS =====
     const [stats, setStats] = useState({
@@ -133,12 +134,16 @@ const Staff = () => {
         navigate(-1);
     };
 
-    // ===== LOAD STAFF =====
+    // ===== LOAD STAFF - FIXED: PROPERLY LOADS DOCTORS =====
     const loadStaff = async () => {
         setLoading(true);
         setErrorMsg('');
         try {
-            // Load from staff table
+            console.log('🔄 Loading staff...');
+
+            // =============================================
+            // 1. LOAD FROM STAFF TABLE
+            // =============================================
             let staffQuery = supabase
                 .from('staff')
                 .select('*');
@@ -168,7 +173,11 @@ const Staff = () => {
                 return;
             }
 
-            // Load from doctors table
+            console.log('✅ Staff data loaded:', staffData?.length || 0, 'records');
+
+            // =============================================
+            // 2. LOAD FROM DOCTORS TABLE
+            // =============================================
             let doctorQuery = supabase
                 .from('doctors')
                 .select('*');
@@ -183,12 +192,24 @@ const Staff = () => {
                 console.error('❌ Doctors Error:', doctorsError);
             }
 
-            // Combine both lists with proper flags
+            console.log('✅ Doctors data loaded:', doctorsData?.length || 0, 'records');
+
+            // =============================================
+            // 3. COMBINE BOTH LISTS
+            // =============================================
             let combinedStaff = [];
 
-            // Add staff with _table = 'staff'
+            // Create a Set to track existing staff names (case insensitive)
+            const existingNames = new Set();
+            const existingEmails = new Set();
+
+            // First, add all staff from staff table
             if (staffData) {
                 staffData.forEach(item => {
+                    existingNames.add(item.name?.toLowerCase());
+                    if (item.email) {
+                        existingEmails.add(item.email.toLowerCase());
+                    }
                     combinedStaff.push({
                         ...item,
                         _table: 'staff'
@@ -196,28 +217,25 @@ const Staff = () => {
                 });
             }
 
-            // Add doctors with _table = 'doctors' (only if not already in staff)
-            if (doctorsData) {
-                const staffNames = new Set(combinedStaff.map(s => s.name));
-                const staffEmails = new Set(combinedStaff.map(s => s.email).filter(Boolean));
-
+            // Then, add doctors that are not already in staff
+            if (doctorsData && doctorsData.length > 0) {
                 doctorsData.forEach(doc => {
-                    // Check if doctor already exists in staff
-                    const existsInStaff = staffEmails.has(doc.email) ||
-                        staffNames.has(doc.name);
+                    const nameExists = existingNames.has(doc.name?.toLowerCase());
+                    const emailExists = doc.email ? existingEmails.has(doc.email.toLowerCase()) : false;
 
-                    if (!existsInStaff) {
+                    if (!nameExists && !emailExists) {
+                        console.log(`📝 Adding doctor to staff view: ${doc.name}`);
                         combinedStaff.push({
                             id: doc.id,
                             _table: 'doctors',
                             name: doc.name,
                             email: doc.email || '',
                             phone: doc.phone || '',
-                            cnic: doc.cnic || '',
-                            date_of_birth: doc.date_of_birth || '',
-                            gender: doc.gender || 'Male',
+                            cnic: '',
+                            date_of_birth: '',
+                            gender: 'Male',
                             role: 'Doctor',
-                            department: 'Medical',
+                            department: doc.department || 'Medical',
                             specialization: doc.specialization || '',
                             qualification: doc.qualification || '',
                             experience: doc.experience || '',
@@ -225,7 +243,7 @@ const Staff = () => {
                             address: doc.address || '',
                             emergency_contact: '',
                             emergency_phone: '',
-                            joining_date: doc.joining_date || new Date().toISOString().split('T')[0],
+                            joining_date: doc.created_at ? new Date(doc.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                             shift: 'Morning',
                             status: doc.availability === 'Available' ? 'Active' :
                                 doc.availability === 'Unavailable' ? 'Inactive' :
@@ -239,6 +257,8 @@ const Staff = () => {
                             created_at: doc.created_at,
                             updated_at: doc.updated_at
                         });
+                    } else {
+                        console.log(`⏭️ Doctor already in staff: ${doc.name}`);
                     }
                 });
             }
@@ -250,6 +270,8 @@ const Staff = () => {
             const activeCount = combinedStaff.filter(s => s.status === 'Active').length;
             const onLeaveCount = combinedStaff.filter(s => s.status === 'On Leave').length;
             const inactiveCount = combinedStaff.filter(s => s.status === 'Inactive').length;
+
+            console.log(`✅ Total combined staff: ${combinedStaff.length} (Staff: ${staffData?.length || 0}, Doctors: ${doctorsData?.length || 0})`);
 
             setStaff(combinedStaff);
             setTotalStaff(combinedStaff.length);
@@ -275,6 +297,199 @@ const Staff = () => {
         loadStaff();
     }, [searchQuery, roleFilter, statusFilter, departmentFilter]);
 
+    // Listen for staff changes from other components
+    useEffect(() => {
+        const handleStaffChange = () => {
+            console.log('📢 Staff changed event received, reloading...');
+            loadStaff();
+        };
+        window.addEventListener('staffChanged', handleStaffChange);
+        window.addEventListener('doctorChanged', handleStaffChange);
+        return () => {
+            window.removeEventListener('staffChanged', handleStaffChange);
+            window.removeEventListener('doctorChanged', handleStaffChange);
+        };
+    }, []);
+
+    // ===== COMPLETE VALIDATION FUNCTIONS =====
+    const validateField = (name, value) => {
+        let error = '';
+
+        switch (name) {
+            case 'name':
+                if (!value || !value.trim()) {
+                    error = 'Full name is required';
+                } else if (value.trim().length < 3) {
+                    error = 'Name must be at least 3 characters';
+                } else if (value.trim().length > 100) {
+                    error = 'Name must be less than 100 characters';
+                } else if (!/^[a-zA-Z\s\-'.]+$/.test(value.trim())) {
+                    error = 'Name contains invalid characters';
+                }
+                break;
+
+            case 'email':
+                if (value && value.trim()) {
+                    if (!/\S+@\S+\.\S+/.test(value.trim())) {
+                        error = 'Enter a valid email address';
+                    } else if (value.trim().length > 100) {
+                        error = 'Email must be less than 100 characters';
+                    }
+                }
+                break;
+
+            case 'phone':
+                if (!value || !value.trim()) {
+                    error = 'Phone number is required';
+                } else if (!/^\+?[0-9\s-]{7,15}$/.test(value.trim())) {
+                    error = 'Enter a valid phone number (7-15 digits)';
+                }
+                break;
+
+            case 'cnic':
+                if (value && value.trim() && !/^[0-9]{5}-[0-9]{7}-[0-9]{1}$/.test(value.trim())) {
+                    error = 'Enter valid CNIC format (xxxxx-xxxxxxx-x)';
+                }
+                break;
+
+            case 'date_of_birth':
+                if (value && value.trim()) {
+                    const dob = new Date(value);
+                    const today = new Date();
+                    let age = today.getFullYear() - dob.getFullYear();
+                    const m = today.getMonth() - dob.getMonth();
+                    if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+                        age--;
+                    }
+                    if (age < 0 || age > 120) {
+                        error = 'Please enter a valid date of birth';
+                    }
+                }
+                break;
+
+            case 'gender':
+                if (!value) {
+                    error = 'Please select a gender';
+                }
+                break;
+
+            case 'role':
+                if (!value) {
+                    error = 'Please select a role';
+                }
+                break;
+
+            case 'department':
+                if (!value) {
+                    error = 'Please select a department';
+                }
+                break;
+
+            case 'qualification':
+                if (value && value.trim().length > 200) {
+                    error = 'Qualification must be less than 200 characters';
+                }
+                break;
+
+            case 'experience':
+                if (value && value.trim()) {
+                    if (!/^[0-9]+$/.test(value.trim())) {
+                        error = 'Experience must be a number';
+                    } else if (parseInt(value) > 50) {
+                        error = 'Experience cannot be more than 50 years';
+                    }
+                }
+                break;
+
+            case 'license_number':
+                if (value && value.trim().length > 50) {
+                    error = 'License number must be less than 50 characters';
+                }
+                break;
+
+            case 'address':
+                if (value && value.trim().length > 200) {
+                    error = 'Address must be less than 200 characters';
+                }
+                break;
+
+            case 'emergency_contact':
+                if (value && value.trim()) {
+                    if (value.trim().length < 3) {
+                        error = 'Emergency contact name must be at least 3 characters';
+                    } else if (value.trim().length > 100) {
+                        error = 'Emergency contact name must be less than 100 characters';
+                    }
+                }
+                break;
+
+            case 'emergency_phone':
+                if (value && value.trim()) {
+                    if (!/^\+?[0-9\s-]{7,15}$/.test(value.trim())) {
+                        error = 'Enter a valid emergency phone number';
+                    }
+                }
+                break;
+
+            case 'username':
+                if (!value || !value.trim()) {
+                    error = 'Username is required';
+                } else if (value.trim().length < 3) {
+                    error = 'Username must be at least 3 characters';
+                } else if (value.trim().length > 50) {
+                    error = 'Username must be less than 50 characters';
+                } else if (!/^[a-zA-Z0-9._]+$/.test(value.trim())) {
+                    error = 'Username can only contain letters, numbers, dots and underscores';
+                }
+                break;
+
+            case 'password':
+                if (!value && !selectedStaff) {
+                    error = 'Password is required';
+                } else if (value && value.trim().length < 6) {
+                    error = 'Password must be at least 6 characters';
+                }
+                break;
+
+            case 'salary':
+                if (value && value.trim() && !/^[0-9]+$/.test(value.trim())) {
+                    error = 'Salary must be a number';
+                }
+                break;
+
+            default:
+                break;
+        }
+
+        return error;
+    };
+
+    // ===== VALIDATE FORM =====
+    const validateForm = () => {
+        const errors = {};
+        const fields = ['name', 'email', 'phone', 'cnic', 'date_of_birth', 'gender', 'role',
+            'department', 'qualification', 'experience', 'license_number', 'address',
+            'emergency_contact', 'emergency_phone', 'username', 'password', 'salary'];
+
+        fields.forEach(field => {
+            const error = validateField(field, formData[field]);
+            if (error) {
+                errors[field] = error;
+            }
+        });
+
+        setFormErrors(errors);
+        return Object.keys(errors).length === 0;
+    };
+
+    // ===== HANDLE FIELD BLUR =====
+    const handleBlur = (e) => {
+        const { name, value } = e.target;
+        setTouched(prev => ({ ...prev, [name]: true }));
+        const error = validateField(name, value);
+        setFormErrors(prev => ({ ...prev, [name]: error }));
+    };
+
     // ===== HANDLE FORM CHANGE =====
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -282,26 +497,6 @@ const Staff = () => {
         if (formErrors[name]) {
             setFormErrors(prev => ({ ...prev, [name]: '' }));
         }
-    };
-
-    // ===== VALIDATE FORM =====
-    const validateForm = () => {
-        const errors = {};
-        if (!formData.name.trim()) errors.name = 'Name is required';
-        if (!formData.phone.trim()) {
-            errors.phone = 'Phone number is required';
-        } else if (!/^\+?[0-9\s-]{7,15}$/.test(formData.phone)) {
-            errors.phone = 'Enter a valid phone number';
-        }
-        if (formData.email && !/\S+@\S+\.\S+/.test(formData.email)) {
-            errors.email = 'Enter a valid email address';
-        }
-        if (!formData.role) errors.role = 'Role is required';
-        if (!formData.username) errors.username = 'Username is required';
-        if (!formData.password && !selectedStaff) errors.password = 'Password is required';
-
-        setFormErrors(errors);
-        return Object.keys(errors).length === 0;
     };
 
     // ===== OPEN MODALS =====
@@ -333,6 +528,7 @@ const Staff = () => {
             nationality: ''
         });
         setFormErrors({});
+        setTouched({});
         setErrorMsg('');
         setSuccessMsg('');
         setIsAddOpen(true);
@@ -367,6 +563,7 @@ const Staff = () => {
             nationality: staff.nationality || ''
         });
         setFormErrors({});
+        setTouched({});
         setErrorMsg('');
         setSuccessMsg('');
         setIsEditOpen(true);
@@ -385,7 +582,21 @@ const Staff = () => {
     // ===== ADD STAFF =====
     const handleAddSubmit = async (e) => {
         e.preventDefault();
-        if (!validateForm()) return;
+
+        const allFields = ['name', 'email', 'phone', 'cnic', 'date_of_birth', 'gender', 'role',
+            'department', 'qualification', 'experience', 'license_number', 'address',
+            'emergency_contact', 'emergency_phone', 'username', 'password', 'salary'];
+        const touchedFields = {};
+        allFields.forEach(field => {
+            touchedFields[field] = true;
+        });
+        setTouched(touchedFields);
+
+        if (!validateForm()) {
+            setErrorMsg('Please fix all validation errors before submitting.');
+            return;
+        }
+
         setActionLoading(true);
         setErrorMsg('');
         try {
@@ -393,7 +604,7 @@ const Staff = () => {
             const { data: existingUser } = await supabase
                 .from('staff')
                 .select('username')
-                .eq('username', formData.username)
+                .eq('username', formData.username.trim())
                 .single();
 
             if (existingUser) {
@@ -404,27 +615,30 @@ const Staff = () => {
 
             // Check if this is a doctor being added
             if (formData.role === 'Doctor') {
-                // Add to doctors table first
+                // Add to doctors table
                 const { data: doctorData, error: doctorError } = await supabase
                     .from('doctors')
                     .insert([{
-                        name: formData.name,
-                        email: formData.email || null,
-                        phone: formData.phone,
+                        name: formData.name.trim(),
+                        email: formData.email ? formData.email.trim() : null,
+                        phone: formData.phone.trim(),
                         specialization: formData.specialization || null,
                         qualification: formData.qualification || null,
                         experience: formData.experience || null,
                         license_number: formData.license_number || null,
+                        address: formData.address || null,
+                        department: formData.department || 'Medical',
                         availability: formData.status === 'Active' ? 'Available' :
                             formData.status === 'On Leave' ? 'On Leave' : 'Unavailable',
-                        address: formData.address || null,
-                        created_at: new Date().toISOString()
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
                     }])
                     .select();
 
                 if (doctorError) {
                     console.error('Doctor Insert Error:', doctorError);
                     setErrorMsg(doctorError.message || 'Failed to add doctor.');
+                    setActionLoading(false);
                     return;
                 }
 
@@ -432,9 +646,12 @@ const Staff = () => {
                 const { error: staffError } = await supabase
                     .from('staff')
                     .insert([{
-                        name: formData.name,
-                        email: formData.email || null,
-                        phone: formData.phone,
+                        name: formData.name.trim(),
+                        email: formData.email ? formData.email.trim() : null,
+                        phone: formData.phone.trim(),
+                        cnic: formData.cnic || null,
+                        date_of_birth: formData.date_of_birth || null,
+                        gender: formData.gender || null,
                         role: 'Doctor',
                         department: formData.department || 'Medical',
                         specialization: formData.specialization || null,
@@ -447,21 +664,22 @@ const Staff = () => {
                         joining_date: formData.joining_date || null,
                         shift: formData.shift || null,
                         status: formData.status || 'Active',
-                        username: formData.username,
+                        username: formData.username.trim(),
                         password: formData.password,
                         salary: formData.salary || null,
                         blood_group: formData.blood_group || null,
                         religion: formData.religion || null,
                         nationality: formData.nationality || null,
-                        created_at: new Date().toISOString()
-                    }])
-                    .select();
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                    }]);
 
                 if (staffError) {
                     console.error('Staff Insert Error:', staffError);
                     // Delete the doctor we just added
                     await supabase.from('doctors').delete().eq('id', doctorData[0].id);
                     setErrorMsg(staffError.message || 'Failed to add to staff.');
+                    setActionLoading(false);
                     return;
                 }
 
@@ -470,9 +688,9 @@ const Staff = () => {
                 const { error } = await supabase
                     .from('staff')
                     .insert([{
-                        name: formData.name,
-                        email: formData.email || null,
-                        phone: formData.phone,
+                        name: formData.name.trim(),
+                        email: formData.email ? formData.email.trim() : null,
+                        phone: formData.phone.trim(),
                         cnic: formData.cnic || null,
                         date_of_birth: formData.date_of_birth || null,
                         gender: formData.gender || null,
@@ -488,27 +706,29 @@ const Staff = () => {
                         joining_date: formData.joining_date || null,
                         shift: formData.shift || null,
                         status: formData.status || 'Active',
-                        username: formData.username,
+                        username: formData.username.trim(),
                         password: formData.password,
                         salary: formData.salary || null,
                         blood_group: formData.blood_group || null,
                         religion: formData.religion || null,
                         nationality: formData.nationality || null,
-                        created_at: new Date().toISOString()
-                    }])
-                    .select();
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                    }]);
 
                 if (error) {
                     console.error('Insert Error:', error);
                     setErrorMsg(error.message || 'Failed to add staff.');
+                    setActionLoading(false);
                     return;
                 }
             }
 
             setSuccessMsg('✅ Staff member added successfully!');
             setIsAddOpen(false);
-            loadStaff();
+            await loadStaff();
             window.dispatchEvent(new Event('staffChanged'));
+            window.dispatchEvent(new Event('doctorChanged'));
         } catch (err) {
             setErrorMsg(err.message || 'Failed to add staff.');
         } finally {
@@ -519,23 +739,39 @@ const Staff = () => {
     // ===== EDIT STAFF =====
     const handleEditSubmit = async (e) => {
         e.preventDefault();
-        if (!validateForm()) return;
+
+        const allFields = ['name', 'email', 'phone', 'cnic', 'date_of_birth', 'gender', 'role',
+            'department', 'qualification', 'experience', 'license_number', 'address',
+            'emergency_contact', 'emergency_phone', 'username', 'password', 'salary'];
+        const touchedFields = {};
+        allFields.forEach(field => {
+            touchedFields[field] = true;
+        });
+        setTouched(touchedFields);
+
+        if (!validateForm()) {
+            setErrorMsg('Please fix all validation errors before submitting.');
+            return;
+        }
+
         setActionLoading(true);
         setErrorMsg('');
         try {
             if (selectedStaff._table === 'doctors') {
                 // Update doctors table
                 const updateData = {
-                    name: formData.name,
-                    email: formData.email || null,
-                    phone: formData.phone,
+                    name: formData.name.trim(),
+                    email: formData.email ? formData.email.trim() : null,
+                    phone: formData.phone.trim(),
                     specialization: formData.specialization || null,
                     qualification: formData.qualification || null,
                     experience: formData.experience || null,
                     license_number: formData.license_number || null,
+                    address: formData.address || null,
+                    department: formData.department || 'Medical',
                     availability: formData.status === 'Active' ? 'Available' :
                         formData.status === 'On Leave' ? 'On Leave' : 'Unavailable',
-                    address: formData.address || null
+                    updated_at: new Date().toISOString()
                 };
 
                 const { error } = await supabase
@@ -546,40 +782,61 @@ const Staff = () => {
                 if (error) {
                     console.error('Update Doctor Error:', error);
                     setErrorMsg(error.message || 'Failed to update doctor.');
+                    setActionLoading(false);
                     return;
                 }
 
-                // Also update in staff table if exists
+                // Also update in staff table
+                const staffUpdateData = {
+                    name: formData.name.trim(),
+                    email: formData.email ? formData.email.trim() : null,
+                    phone: formData.phone.trim(),
+                    role: 'Doctor',
+                    department: formData.department || 'Medical',
+                    specialization: formData.specialization || null,
+                    qualification: formData.qualification || null,
+                    experience: formData.experience || null,
+                    license_number: formData.license_number || null,
+                    address: formData.address || null,
+                    emergency_contact: formData.emergency_contact || null,
+                    emergency_phone: formData.emergency_phone || null,
+                    joining_date: formData.joining_date || null,
+                    shift: formData.shift || null,
+                    status: formData.status || 'Active',
+                    username: formData.username.trim(),
+                    salary: formData.salary || null,
+                    blood_group: formData.blood_group || null,
+                    religion: formData.religion || null,
+                    nationality: formData.nationality || null,
+                    updated_at: new Date().toISOString()
+                };
+
+                if (formData.password) {
+                    staffUpdateData.password = formData.password;
+                }
+
                 const { error: staffUpdateError } = await supabase
                     .from('staff')
-                    .update({
-                        name: formData.name,
-                        email: formData.email || null,
-                        phone: formData.phone,
-                        role: 'Doctor',
-                        department: formData.department || 'Medical',
-                        specialization: formData.specialization || null,
-                        qualification: formData.qualification || null,
-                        experience: formData.experience || null,
-                        license_number: formData.license_number || null,
-                        address: formData.address || null,
-                        emergency_contact: formData.emergency_contact || null,
-                        emergency_phone: formData.emergency_phone || null,
-                        joining_date: formData.joining_date || null,
-                        shift: formData.shift || null,
-                        status: formData.status || 'Active',
-                        username: formData.username,
-                        salary: formData.salary || null,
-                        blood_group: formData.blood_group || null,
-                        religion: formData.religion || null,
-                        nationality: formData.nationality || null,
-                        updated_at: new Date().toISOString()
-                    })
+                    .update(staffUpdateData)
                     .eq('name', selectedStaff.name)
                     .eq('role', 'Doctor');
 
                 if (staffUpdateError) {
                     console.warn('Staff update warning:', staffUpdateError);
+                    // If not found in staff, insert it
+                    const { error: staffInsertError } = await supabase
+                        .from('staff')
+                        .insert([{
+                            ...staffUpdateData,
+                            cnic: formData.cnic || null,
+                            date_of_birth: formData.date_of_birth || null,
+                            gender: formData.gender || null,
+                            created_at: new Date().toISOString()
+                        }]);
+
+                    if (staffInsertError) {
+                        console.warn('Staff insert warning:', staffInsertError);
+                    }
                 }
 
             } else {
@@ -588,7 +845,7 @@ const Staff = () => {
                     const { data: existingUser } = await supabase
                         .from('staff')
                         .select('username')
-                        .eq('username', formData.username)
+                        .eq('username', formData.username.trim())
                         .neq('id', selectedStaff.id)
                         .single();
 
@@ -600,9 +857,9 @@ const Staff = () => {
                 }
 
                 const updateData = {
-                    name: formData.name,
-                    email: formData.email || null,
-                    phone: formData.phone,
+                    name: formData.name.trim(),
+                    email: formData.email ? formData.email.trim() : null,
+                    phone: formData.phone.trim(),
                     cnic: formData.cnic || null,
                     date_of_birth: formData.date_of_birth || null,
                     gender: formData.gender || null,
@@ -618,7 +875,7 @@ const Staff = () => {
                     joining_date: formData.joining_date || null,
                     shift: formData.shift || null,
                     status: formData.status || 'Active',
-                    username: formData.username,
+                    username: formData.username.trim(),
                     salary: formData.salary || null,
                     blood_group: formData.blood_group || null,
                     religion: formData.religion || null,
@@ -638,6 +895,7 @@ const Staff = () => {
                 if (error) {
                     console.error('Update Staff Error:', error);
                     setErrorMsg(error.message || 'Failed to update staff.');
+                    setActionLoading(false);
                     return;
                 }
 
@@ -646,46 +904,54 @@ const Staff = () => {
                     const { error: doctorUpdateError } = await supabase
                         .from('doctors')
                         .update({
-                            name: formData.name,
-                            email: formData.email || null,
-                            phone: formData.phone,
+                            name: formData.name.trim(),
+                            email: formData.email ? formData.email.trim() : null,
+                            phone: formData.phone.trim(),
                             specialization: formData.specialization || null,
                             qualification: formData.qualification || null,
                             experience: formData.experience || null,
                             license_number: formData.license_number || null,
+                            address: formData.address || null,
+                            department: formData.department || 'Medical',
                             availability: formData.status === 'Active' ? 'Available' :
                                 formData.status === 'On Leave' ? 'On Leave' : 'Unavailable',
-                            address: formData.address || null
+                            updated_at: new Date().toISOString()
                         })
-                        .eq('name', selectedStaff.name)
-                        .eq('specialization', selectedStaff.specialization || '');
+                        .eq('name', selectedStaff.name);
 
                     if (doctorUpdateError) {
                         console.warn('Doctor update warning:', doctorUpdateError);
                         // If doctor doesn't exist, create one
-                        await supabase
+                        const { error: doctorInsertError } = await supabase
                             .from('doctors')
                             .insert([{
-                                name: formData.name,
-                                email: formData.email || null,
-                                phone: formData.phone,
+                                name: formData.name.trim(),
+                                email: formData.email ? formData.email.trim() : null,
+                                phone: formData.phone.trim(),
                                 specialization: formData.specialization || null,
                                 qualification: formData.qualification || null,
                                 experience: formData.experience || null,
                                 license_number: formData.license_number || null,
+                                address: formData.address || null,
+                                department: formData.department || 'Medical',
                                 availability: formData.status === 'Active' ? 'Available' :
                                     formData.status === 'On Leave' ? 'On Leave' : 'Unavailable',
-                                address: formData.address || null,
-                                created_at: new Date().toISOString()
+                                created_at: new Date().toISOString(),
+                                updated_at: new Date().toISOString()
                             }]);
+
+                        if (doctorInsertError) {
+                            console.warn('Doctor insert warning:', doctorInsertError);
+                        }
                     }
                 }
             }
 
             setSuccessMsg('✅ Staff member updated successfully!');
             setIsEditOpen(false);
-            loadStaff();
+            await loadStaff();
             window.dispatchEvent(new Event('staffChanged'));
+            window.dispatchEvent(new Event('doctorChanged'));
         } catch (err) {
             setErrorMsg(err.message || 'Failed to update staff.');
         } finally {
@@ -707,6 +973,7 @@ const Staff = () => {
                 if (error) {
                     console.error('Delete Doctor Error:', error);
                     setErrorMsg(error.message || 'Failed to delete doctor.');
+                    setActionLoading(false);
                     return;
                 }
 
@@ -726,6 +993,7 @@ const Staff = () => {
                 if (error) {
                     console.error('Delete Staff Error:', error);
                     setErrorMsg(error.message || 'Failed to delete staff.');
+                    setActionLoading(false);
                     return;
                 }
 
@@ -734,14 +1002,14 @@ const Staff = () => {
                     await supabase
                         .from('doctors')
                         .delete()
-                        .eq('name', selectedStaff.name)
-                        .eq('specialization', selectedStaff.specialization || '');
+                        .eq('name', selectedStaff.name);
                 }
             }
 
             setIsDeleteOpen(false);
-            loadStaff();
+            await loadStaff();
             window.dispatchEvent(new Event('staffChanged'));
+            window.dispatchEvent(new Event('doctorChanged'));
             setSuccessMsg('✅ Staff member deleted successfully!');
         } catch (err) {
             setErrorMsg(err.message || 'Failed to delete staff.');
@@ -1679,6 +1947,7 @@ const Staff = () => {
                                         value={formData.cnic}
                                         onChange={handleInputChange}
                                         placeholder="e.g. 42101-1234567-1"
+                                        error={formErrors.cnic}
                                     />
                                 </div>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px' }}>
@@ -1688,6 +1957,7 @@ const Staff = () => {
                                         type="date"
                                         value={formData.date_of_birth}
                                         onChange={handleInputChange}
+                                        error={formErrors.date_of_birth}
                                     />
                                     <div className="form-group">
                                         <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)' }}>Gender</label>
@@ -1696,12 +1966,14 @@ const Staff = () => {
                                             className="hms-select"
                                             value={formData.gender}
                                             onChange={handleInputChange}
-                                            style={{ width: '100%', height: '42px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.85rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
+                                            onBlur={handleBlur}
+                                            style={{ width: '100%', height: '42px', padding: '0 12px', border: formErrors.gender && touched.gender ? '2px solid var(--danger-color)' : '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.85rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
                                         >
                                             {genders.map(g => (
                                                 <option key={g} value={g}>{g}</option>
                                             ))}
                                         </select>
+                                        {formErrors.gender && touched.gender && <span className="error-text" style={{ fontSize: '0.75rem', color: 'var(--danger-color)' }}>{formErrors.gender}</span>}
                                     </div>
                                     <div className="form-group">
                                         <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)' }}>Blood Group</label>
@@ -1741,13 +2013,14 @@ const Staff = () => {
                                             className="hms-select"
                                             value={formData.role}
                                             onChange={handleInputChange}
-                                            style={{ width: '100%', height: '42px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.85rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
+                                            onBlur={handleBlur}
+                                            style={{ width: '100%', height: '42px', padding: '0 12px', border: formErrors.role && touched.role ? '2px solid var(--danger-color)' : '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.85rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
                                         >
                                             {allRoles.map(role => (
                                                 <option key={role} value={role}>{role}</option>
                                             ))}
                                         </select>
-                                        {formErrors.role && <span className="error-text" style={{ fontSize: '0.75rem', color: 'var(--danger-color)' }}>{formErrors.role}</span>}
+                                        {formErrors.role && touched.role && <span className="error-text" style={{ fontSize: '0.75rem', color: 'var(--danger-color)' }}>{formErrors.role}</span>}
                                     </div>
                                     <div className="form-group">
                                         <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)' }}>Department</label>
@@ -1756,13 +2029,15 @@ const Staff = () => {
                                             className="hms-select"
                                             value={formData.department}
                                             onChange={handleInputChange}
-                                            style={{ width: '100%', height: '42px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.85rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
+                                            onBlur={handleBlur}
+                                            style={{ width: '100%', height: '42px', padding: '0 12px', border: formErrors.department && touched.department ? '2px solid var(--danger-color)' : '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.85rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
                                         >
                                             <option value="">Select Department</option>
                                             {allDepartments.map(dept => (
                                                 <option key={dept} value={dept}>{dept}</option>
                                             ))}
                                         </select>
+                                        {formErrors.department && touched.department && <span className="error-text" style={{ fontSize: '0.75rem', color: 'var(--danger-color)' }}>{formErrors.department}</span>}
                                     </div>
                                 </div>
 
@@ -1781,6 +2056,7 @@ const Staff = () => {
                                             value={formData.license_number}
                                             onChange={handleInputChange}
                                             placeholder="e.g. PMC-12345"
+                                            error={formErrors.license_number}
                                         />
                                     </div>
                                 )}
@@ -1792,6 +2068,7 @@ const Staff = () => {
                                         value={formData.qualification}
                                         onChange={handleInputChange}
                                         placeholder="e.g. MBBS, FCPS"
+                                        error={formErrors.qualification}
                                     />
                                     <InputField
                                         label="Experience (Years)"
@@ -1799,6 +2076,7 @@ const Staff = () => {
                                         value={formData.experience}
                                         onChange={handleInputChange}
                                         placeholder="e.g. 5"
+                                        error={formErrors.experience}
                                     />
                                 </div>
 
@@ -1808,6 +2086,7 @@ const Staff = () => {
                                     value={formData.address}
                                     onChange={handleInputChange}
                                     placeholder="e.g. House 45-B, Sector G-11, Islamabad"
+                                    error={formErrors.address}
                                 />
 
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
@@ -1817,6 +2096,7 @@ const Staff = () => {
                                         value={formData.emergency_contact}
                                         onChange={handleInputChange}
                                         placeholder="e.g. Sara Khan (Wife)"
+                                        error={formErrors.emergency_contact}
                                     />
                                     <InputField
                                         label="Emergency Contact Phone"
@@ -1824,6 +2104,7 @@ const Staff = () => {
                                         value={formData.emergency_phone}
                                         onChange={handleInputChange}
                                         placeholder="e.g. 0300-9876543"
+                                        error={formErrors.emergency_phone}
                                     />
                                 </div>
 
@@ -1894,10 +2175,37 @@ const Staff = () => {
                                         type="password"
                                         value={formData.password}
                                         onChange={handleInputChange}
-                                        placeholder="Min 8 characters"
+                                        placeholder="Min 6 characters"
                                         error={formErrors.password}
                                         required
                                     />
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                                    <InputField
+                                        label="Salary"
+                                        name="salary"
+                                        value={formData.salary}
+                                        onChange={handleInputChange}
+                                        placeholder="e.g. 50000"
+                                        error={formErrors.salary}
+                                    />
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <InputField
+                                            label="Religion"
+                                            name="religion"
+                                            value={formData.religion}
+                                            onChange={handleInputChange}
+                                            placeholder="e.g. Islam"
+                                        />
+                                        <InputField
+                                            label="Nationality"
+                                            name="nationality"
+                                            value={formData.nationality}
+                                            onChange={handleInputChange}
+                                            placeholder="e.g. Pakistani"
+                                        />
+                                    </div>
                                 </div>
 
                                 {/* Form Actions */}
@@ -1942,7 +2250,7 @@ const Staff = () => {
                                             padding: '10px 28px',
                                             border: 'none',
                                             borderRadius: '10px',
-                                            background: 'var(--primary-color)',
+                                            background: actionLoading ? '#93c5fd' : 'var(--primary-color)',
                                             cursor: actionLoading ? 'not-allowed' : 'pointer',
                                             fontSize: '0.85rem',
                                             fontFamily: 'var(--font-family)',
@@ -1979,7 +2287,9 @@ const Staff = () => {
                 </div>
             )}
 
+            {/* ============================================================ */}
             {/* ===== VIEW STAFF MODAL ===== */}
+            {/* ============================================================ */}
             {isViewOpen && selectedStaff && (
                 <div className="hms-modal-backdrop" onClick={() => setIsViewOpen(false)}>
                     <div className="hms-modal" onClick={(e) => e.stopPropagation()} style={{
@@ -2364,7 +2674,9 @@ const Staff = () => {
                 </div>
             )}
 
+            {/* ============================================================ */}
             {/* ===== EDIT STAFF MODAL ===== */}
+            {/* ============================================================ */}
             {isEditOpen && selectedStaff && (
                 <div className="hms-modal-backdrop" onClick={() => setIsEditOpen(false)}>
                     <div className="hms-modal" onClick={(e) => e.stopPropagation()} style={{
@@ -2505,6 +2817,7 @@ const Staff = () => {
                                         value={formData.cnic}
                                         onChange={handleInputChange}
                                         placeholder="e.g. 42101-1234567-1"
+                                        error={formErrors.cnic}
                                     />
                                 </div>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px' }}>
@@ -2514,6 +2827,7 @@ const Staff = () => {
                                         type="date"
                                         value={formData.date_of_birth}
                                         onChange={handleInputChange}
+                                        error={formErrors.date_of_birth}
                                     />
                                     <div className="form-group">
                                         <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)' }}>Gender</label>
@@ -2522,12 +2836,14 @@ const Staff = () => {
                                             className="hms-select"
                                             value={formData.gender}
                                             onChange={handleInputChange}
-                                            style={{ width: '100%', height: '42px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.85rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
+                                            onBlur={handleBlur}
+                                            style={{ width: '100%', height: '42px', padding: '0 12px', border: formErrors.gender && touched.gender ? '2px solid var(--danger-color)' : '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.85rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
                                         >
                                             {genders.map(g => (
                                                 <option key={g} value={g}>{g}</option>
                                             ))}
                                         </select>
+                                        {formErrors.gender && touched.gender && <span className="error-text" style={{ fontSize: '0.75rem', color: 'var(--danger-color)' }}>{formErrors.gender}</span>}
                                     </div>
                                     <div className="form-group">
                                         <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)' }}>Blood Group</label>
@@ -2567,13 +2883,14 @@ const Staff = () => {
                                             className="hms-select"
                                             value={formData.role}
                                             onChange={handleInputChange}
-                                            style={{ width: '100%', height: '42px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.85rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
+                                            onBlur={handleBlur}
+                                            style={{ width: '100%', height: '42px', padding: '0 12px', border: formErrors.role && touched.role ? '2px solid var(--danger-color)' : '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.85rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
                                         >
                                             {allRoles.map(role => (
                                                 <option key={role} value={role}>{role}</option>
                                             ))}
                                         </select>
-                                        {formErrors.role && <span className="error-text" style={{ fontSize: '0.75rem', color: 'var(--danger-color)' }}>{formErrors.role}</span>}
+                                        {formErrors.role && touched.role && <span className="error-text" style={{ fontSize: '0.75rem', color: 'var(--danger-color)' }}>{formErrors.role}</span>}
                                     </div>
                                     <div className="form-group">
                                         <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)' }}>Department</label>
@@ -2582,13 +2899,15 @@ const Staff = () => {
                                             className="hms-select"
                                             value={formData.department}
                                             onChange={handleInputChange}
-                                            style={{ width: '100%', height: '42px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.85rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
+                                            onBlur={handleBlur}
+                                            style={{ width: '100%', height: '42px', padding: '0 12px', border: formErrors.department && touched.department ? '2px solid var(--danger-color)' : '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.85rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
                                         >
                                             <option value="">Select Department</option>
                                             {allDepartments.map(dept => (
                                                 <option key={dept} value={dept}>{dept}</option>
                                             ))}
                                         </select>
+                                        {formErrors.department && touched.department && <span className="error-text" style={{ fontSize: '0.75rem', color: 'var(--danger-color)' }}>{formErrors.department}</span>}
                                     </div>
                                 </div>
 
@@ -2607,6 +2926,7 @@ const Staff = () => {
                                             value={formData.license_number}
                                             onChange={handleInputChange}
                                             placeholder="e.g. PMC-12345"
+                                            error={formErrors.license_number}
                                         />
                                     </div>
                                 )}
@@ -2618,6 +2938,7 @@ const Staff = () => {
                                         value={formData.qualification}
                                         onChange={handleInputChange}
                                         placeholder="e.g. MBBS, FCPS"
+                                        error={formErrors.qualification}
                                     />
                                     <InputField
                                         label="Experience (Years)"
@@ -2625,6 +2946,7 @@ const Staff = () => {
                                         value={formData.experience}
                                         onChange={handleInputChange}
                                         placeholder="e.g. 5"
+                                        error={formErrors.experience}
                                     />
                                 </div>
 
@@ -2634,6 +2956,7 @@ const Staff = () => {
                                     value={formData.address}
                                     onChange={handleInputChange}
                                     placeholder="e.g. House 45-B, Sector G-11, Islamabad"
+                                    error={formErrors.address}
                                 />
 
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
@@ -2643,6 +2966,7 @@ const Staff = () => {
                                         value={formData.emergency_contact}
                                         onChange={handleInputChange}
                                         placeholder="e.g. Sara Khan (Wife)"
+                                        error={formErrors.emergency_contact}
                                     />
                                     <InputField
                                         label="Emergency Contact Phone"
@@ -2650,6 +2974,7 @@ const Staff = () => {
                                         value={formData.emergency_phone}
                                         onChange={handleInputChange}
                                         placeholder="e.g. 0300-9876543"
+                                        error={formErrors.emergency_phone}
                                     />
                                 </div>
 
@@ -2721,7 +3046,35 @@ const Staff = () => {
                                         value={formData.password}
                                         onChange={handleInputChange}
                                         placeholder="Enter new password to change"
+                                        error={formErrors.password}
                                     />
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                                    <InputField
+                                        label="Salary"
+                                        name="salary"
+                                        value={formData.salary}
+                                        onChange={handleInputChange}
+                                        placeholder="e.g. 50000"
+                                        error={formErrors.salary}
+                                    />
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <InputField
+                                            label="Religion"
+                                            name="religion"
+                                            value={formData.religion}
+                                            onChange={handleInputChange}
+                                            placeholder="e.g. Islam"
+                                        />
+                                        <InputField
+                                            label="Nationality"
+                                            name="nationality"
+                                            value={formData.nationality}
+                                            onChange={handleInputChange}
+                                            placeholder="e.g. Pakistani"
+                                        />
+                                    </div>
                                 </div>
 
                                 {/* Form Actions */}
@@ -2766,7 +3119,7 @@ const Staff = () => {
                                             padding: '10px 28px',
                                             border: 'none',
                                             borderRadius: '10px',
-                                            background: 'var(--primary-color)',
+                                            background: actionLoading ? '#93c5fd' : 'var(--primary-color)',
                                             cursor: actionLoading ? 'not-allowed' : 'pointer',
                                             fontSize: '0.85rem',
                                             fontFamily: 'var(--font-family)',
@@ -2803,7 +3156,9 @@ const Staff = () => {
                 </div>
             )}
 
+            {/* ============================================================ */}
             {/* ===== DELETE CONFIRMATION MODAL ===== */}
+            {/* ============================================================ */}
             {isDeleteOpen && (
                 <div className="hms-modal-backdrop" onClick={() => setIsDeleteOpen(false)}>
                     <div className="hms-modal small" onClick={(e) => e.stopPropagation()} style={{
@@ -2903,7 +3258,7 @@ const Staff = () => {
                                     padding: '8px 20px',
                                     border: 'none',
                                     borderRadius: '8px',
-                                    background: 'var(--danger-color)',
+                                    background: actionLoading ? '#fca5a5' : 'var(--danger-color)',
                                     cursor: actionLoading ? 'not-allowed' : 'pointer',
                                     fontSize: '0.85rem',
                                     fontFamily: 'var(--font-family)',

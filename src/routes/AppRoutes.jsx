@@ -32,6 +32,7 @@ import Reports from '../pages/Reports';
 import Staff from '../pages/Staff';
 import AddPatient from '../pages/AddPatient';
 import Beds from '../pages/Beds';
+import Vitals from '../pages/Vitals';
 
 // ===== Temporary Pages for Quick Actions =====
 const TempPage = ({ title, icon, description }) => (
@@ -219,14 +220,6 @@ const AppRoutes = () => {
           </RoleRoute>
         }
       />
-      <Route
-        path="/billing"
-        element={
-          <RoleRoute allowedRoles={['Billing Staff']}>
-            <BillingDashboard />
-          </RoleRoute>
-        }
-      />
 
       {/* ===== PROFILE & SETTINGS ROUTES ===== */}
       <Route
@@ -295,14 +288,27 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+
+      {/* ===== VITALS ROUTE ===== */}
       <Route
-        path="/billing"
+        path="/vitals"
         element={
           <ProtectedRoute>
-            <Billing />
+            <Vitals />
           </ProtectedRoute>
         }
       />
+
+      {/* ===== BILLING ROUTE - FIXED (Single route) ===== */}
+      <Route
+        path="/billing"
+        element={
+          <RoleRoute allowedRoles={['Admin', 'Billing Staff']}>
+            <Billing />
+          </RoleRoute>
+        }
+      />
+
       <Route
         path="/inventory"
         element={
@@ -328,7 +334,7 @@ const AppRoutes = () => {
         }
       />
 
-      {/* ===== STAFF ROUTE - TEMPORARILY OPEN FOR ALL (TESTING) ===== */}
+      {/* ===== STAFF ROUTE ===== */}
       <Route
         path="/staff"
         element={
@@ -380,18 +386,17 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+
+      {/* ===== VITALS QUICK ACTION ===== */}
       <Route
         path="/patients/vitals"
         element={
           <ProtectedRoute>
-            <TempPage
-              title="Vital Signs"
-              icon="❤️"
-              description="Record patient vital signs including blood pressure, heart rate, temperature, and more."
-            />
+            <Navigate to="/vitals" replace />
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/activity"
         element={

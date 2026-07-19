@@ -14,7 +14,10 @@ import {
     Building, Globe, Briefcase, GraduationCap,
     Languages, MessageCircle, Shield, FileCheck,
     ClipboardCheck, Stethoscope as StethoscopeIcon,
-    Scissors
+    Scissors, TrendingUp, TrendingDown, UserPlus,
+    UserCheck, UserX, Calendar as CalendarIcon,
+    Clock as ClockIcon, Hospital, BedDouble,
+    AlertTriangle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -34,6 +37,22 @@ const Patients = () => {
     const [activeTab, setActiveTab] = useState('demographics');
     const limit = 8;
 
+    // ===== DASHBOARD STATS =====
+    const [dashboardStats, setDashboardStats] = useState({
+        totalPatients: 0,
+        newPatients: 0,
+        activePatients: 0,
+        inactivePatients: 0,
+        dischargedPatients: 0,
+        malePatients: 0,
+        femalePatients: 0,
+        emergencyPatients: 0,
+        todayAppointments: 0,
+        pendingPrescriptions: 0,
+        totalBeds: 0,
+        occupiedBeds: 0
+    });
+
     // Modals
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
     const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -45,9 +64,14 @@ const Patients = () => {
     const [loadingAppointments, setLoadingAppointments] = useState(false);
     const [loadingPrescriptions, setLoadingPrescriptions] = useState(false);
 
+    // ===== SUB MODAL STATES =====
+    const [showAppointmentDetail, setShowAppointmentDetail] = useState(false);
+    const [showPrescriptionDetail, setShowPrescriptionDetail] = useState(false);
+    const [selectedAppointment, setSelectedAppointment] = useState(null);
+    const [selectedPrescription, setSelectedPrescription] = useState(null);
+
     // Form state - For Edit Modal
     const [formData, setFormData] = useState({
-        // Personal Information
         name: '',
         email: '',
         phone: '',
@@ -61,15 +85,11 @@ const Patients = () => {
         marital_status: '',
         occupation: '',
         education: '',
-
-        // Contact Information
         address: '',
         city: '',
         state: '',
         country: '',
         zip_code: '',
-
-        // Medical Information
         medical_history: '',
         allergies: '',
         current_medications: '',
@@ -83,33 +103,21 @@ const Patients = () => {
         weight: '',
         height: '',
         bmi: '',
-
-        // Emergency Contact
         emergency_contact: '',
         emergency_phone: '',
         emergency_relationship: '',
-
-        // Guardian Information
         guardian_name: '',
         guardian_phone: '',
         guardian_relationship: '',
-
-        // Insurance Information
         insurance_provider: '',
         insurance_policy_number: '',
         insurance_expiry: '',
-
-        // Referral Information
         referred_by: '',
         referral_doctor: '',
         referral_hospital: '',
-
-        // Additional Information
         preferred_language: '',
         preferred_contact_method: '',
         notes: '',
-
-        // Status
         status: 'Active'
     });
 
@@ -156,6 +164,86 @@ const Patients = () => {
         }
     };
 
+    // ===== FETCH DASHBOARD STATS =====
+    const fetchDashboardStats = async () => {
+        try {
+            const { data: allPatients, error: patientsError } = await supabase
+                .from('patients')
+                .select('id, status, gender, is_emergency, created_at');
+
+            if (patientsError) throw patientsError;
+
+            const total = allPatients?.length || 0;
+
+            const weekAgo = new Date();
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            const newPatients = allPatients?.filter(p =>
+                p && p.created_at && new Date(p.created_at) >= weekAgo
+            ).length || 0;
+
+            const activePatients = allPatients?.filter(p => p && p.status === 'Active').length || 0;
+            const inactivePatients = allPatients?.filter(p => p && p.status === 'Inactive').length || 0;
+            const dischargedPatients = allPatients?.filter(p => p && p.status === 'Discharged').length || 0;
+            const emergencyPatients = allPatients?.filter(p => p && p.is_emergency === true).length || 0;
+
+            const today = new Date().toISOString().split('T')[0];
+            const { data: todayAppts, error: apptError } = await supabase
+                .from('appointments')
+                .select('id')
+                .eq('appointment_date', today);
+
+            if (apptError) throw apptError;
+
+            const { data: pendingPresc, error: prescError } = await supabase
+                .from('prescriptions')
+                .select('id')
+                .eq('status', 'active');
+
+            if (prescError) throw prescError;
+
+            const { data: beds, error: bedsError } = await supabase
+                .from('beds')
+                .select('status');
+
+            if (bedsError) throw bedsError;
+
+            const totalBeds = beds?.length || 0;
+            const occupiedBeds = beds?.filter(b => b && b.status === 'occupied').length || 0;
+
+            setDashboardStats({
+                totalPatients: total,
+                newPatients: newPatients,
+                activePatients: activePatients,
+                inactivePatients: inactivePatients,
+                dischargedPatients: dischargedPatients,
+                malePatients: allPatients?.filter(p => p && p.gender === 'Male').length || 0,
+                femalePatients: allPatients?.filter(p => p && p.gender === 'Female').length || 0,
+                emergencyPatients: emergencyPatients,
+                todayAppointments: todayAppts?.length || 0,
+                pendingPrescriptions: pendingPresc?.length || 0,
+                totalBeds: totalBeds,
+                occupiedBeds: occupiedBeds
+            });
+
+        } catch (err) {
+            console.error('Error fetching dashboard stats:', err);
+            setDashboardStats({
+                totalPatients: 0,
+                newPatients: 0,
+                activePatients: 0,
+                inactivePatients: 0,
+                dischargedPatients: 0,
+                malePatients: 0,
+                femalePatients: 0,
+                emergencyPatients: 0,
+                todayAppointments: 0,
+                pendingPrescriptions: 0,
+                totalBeds: 0,
+                occupiedBeds: 0
+            });
+        }
+    };
+
     // ===== LOAD PATIENTS =====
     const loadPatients = async () => {
         setLoading(true);
@@ -197,12 +285,15 @@ const Patients = () => {
 
     useEffect(() => {
         loadPatients();
+        fetchDashboardStats();
     }, [searchQuery, genderFilter, bloodFilter, statusFilter, currentPage]);
 
-    // ===== FETCH PATIENT APPOINTMENTS =====
+    // ===== FETCH PATIENT APPOINTMENTS - FIXED =====
     const fetchPatientAppointments = async (patientId) => {
         setLoadingAppointments(true);
         try {
+            console.log('🔄 Fetching appointments for patient:', patientId);
+
             const { data, error } = await supabase
                 .from('appointments')
                 .select(`
@@ -211,44 +302,106 @@ const Patients = () => {
                     time_slot,
                     status,
                     reason,
-                    doctors:doctor_id (name, specialization)
+                    doctor_id,
+                    patient_id,
+                    created_at,
+                    notes
                 `)
                 .eq('patient_id', patientId)
                 .order('appointment_date', { ascending: false })
                 .limit(10);
 
-            if (error) throw error;
+            if (error) {
+                console.error('❌ Error fetching appointments:', error);
+                throw error;
+            }
+
+            console.log('✅ Appointments fetched:', data);
+
+            if (data && data.length > 0) {
+                const doctorIds = [...new Set(data.map(appt => appt.doctor_id).filter(id => id))];
+
+                if (doctorIds.length > 0) {
+                    const { data: doctorsData, error: doctorsError } = await supabase
+                        .from('doctors')
+                        .select('id, name, specialization')
+                        .in('id', doctorIds);
+
+                    if (!doctorsError) {
+                        const mergedData = data.map(appt => ({
+                            ...appt,
+                            doctors: doctorsData?.find(d => d.id === appt.doctor_id) || null
+                        }));
+                        console.log('📋 Merged appointments:', mergedData);
+                        setPatientAppointments(mergedData);
+                        setLoadingAppointments(false);
+                        return;
+                    }
+                }
+            }
+
             setPatientAppointments(data || []);
         } catch (err) {
-            console.error('Error fetching appointments:', err);
+            console.error('❌ Error fetching appointments:', err);
             setPatientAppointments([]);
         } finally {
             setLoadingAppointments(false);
         }
     };
 
-    // ===== FETCH PATIENT PRESCRIPTIONS =====
+    // ===== FETCH PATIENT PRESCRIPTIONS - FIXED (NO created_at) =====
     const fetchPatientPrescriptions = async (patientId) => {
         setLoadingPrescriptions(true);
         try {
+            console.log('🔄 Fetching prescriptions for patient:', patientId);
+
+            // Using id for ordering since created_at might not exist
             const { data, error } = await supabase
                 .from('prescriptions')
-                .select(`
-                    id,
-                    date,
-                    diagnosis,
-                    medications,
-                    status,
-                    doctors:doctor_id (name, specialization)
-                `)
+                .select('*')
                 .eq('patient_id', patientId)
-                .order('date', { ascending: false })
+                .order('id', { ascending: false })
                 .limit(10);
 
-            if (error) throw error;
+            if (error) {
+                console.error('❌ Error fetching prescriptions:', error);
+                throw error;
+            }
+
+            console.log('✅ Prescriptions fetched:', data);
+            console.log('📊 Total prescriptions:', data?.length || 0);
+
+            // If we have prescriptions, try to get doctor names
+            if (data && data.length > 0) {
+                const hasDoctorId = data.some(p => p.doctor_id);
+
+                if (hasDoctorId) {
+                    const doctorIds = [...new Set(data.map(presc => presc.doctor_id).filter(id => id))];
+
+                    if (doctorIds.length > 0) {
+                        console.log('👤 Fetching doctors:', doctorIds);
+                        const { data: doctorsData, error: doctorsError } = await supabase
+                            .from('doctors')
+                            .select('id, name, specialization')
+                            .in('id', doctorIds);
+
+                        if (!doctorsError && doctorsData) {
+                            const mergedData = data.map(presc => ({
+                                ...presc,
+                                doctors: doctorsData?.find(d => d.id === presc.doctor_id) || null
+                            }));
+                            console.log('📋 Merged prescriptions:', mergedData);
+                            setPatientPrescriptions(mergedData);
+                            setLoadingPrescriptions(false);
+                            return;
+                        }
+                    }
+                }
+            }
+
             setPatientPrescriptions(data || []);
         } catch (err) {
-            console.error('Error fetching prescriptions:', err);
+            console.error('❌ Error fetching prescriptions:', err);
             setPatientPrescriptions([]);
         } finally {
             setLoadingPrescriptions(false);
@@ -261,7 +414,6 @@ const Patients = () => {
         setActiveTab('demographics');
         setIsDetailOpen(true);
 
-        // Fetch appointments and prescriptions in background
         try {
             await Promise.all([
                 fetchPatientAppointments(patient.id),
@@ -303,7 +455,6 @@ const Patients = () => {
     const openEditModal = (patient) => {
         setSelectedPatient(patient);
         setFormData({
-            // Personal Information
             name: patient.name || '',
             email: patient.email || '',
             phone: patient.phone || '',
@@ -317,15 +468,11 @@ const Patients = () => {
             marital_status: patient.marital_status || '',
             occupation: patient.occupation || '',
             education: patient.education || '',
-
-            // Contact Information
             address: patient.address || '',
             city: patient.city || '',
             state: patient.state || '',
             country: patient.country || '',
             zip_code: patient.zip_code || '',
-
-            // Medical Information
             medical_history: patient.medical_history || '',
             allergies: patient.allergies || '',
             current_medications: patient.current_medications || '',
@@ -339,33 +486,21 @@ const Patients = () => {
             weight: patient.weight || '',
             height: patient.height || '',
             bmi: patient.bmi || '',
-
-            // Emergency Contact
             emergency_contact: patient.emergency_contact || '',
             emergency_phone: patient.emergency_phone || '',
             emergency_relationship: patient.emergency_relationship || '',
-
-            // Guardian Information
             guardian_name: patient.guardian_name || '',
             guardian_phone: patient.guardian_phone || '',
             guardian_relationship: patient.guardian_relationship || '',
-
-            // Insurance Information
             insurance_provider: patient.insurance_provider || '',
             insurance_policy_number: patient.insurance_policy_number || '',
             insurance_expiry: patient.insurance_expiry || '',
-
-            // Referral Information
             referred_by: patient.referred_by || '',
             referral_doctor: patient.referral_doctor || '',
             referral_hospital: patient.referral_hospital || '',
-
-            // Additional Information
             preferred_language: patient.preferred_language || '',
             preferred_contact_method: patient.preferred_contact_method || '',
             notes: patient.notes || '',
-
-            // Status
             status: patient.status || 'Active'
         });
         setFormErrors({});
@@ -384,7 +519,6 @@ const Patients = () => {
             const { error } = await supabase
                 .from('patients')
                 .update({
-                    // Personal Information
                     name: formData.name,
                     email: formData.email || null,
                     phone: formData.phone,
@@ -398,15 +532,11 @@ const Patients = () => {
                     marital_status: formData.marital_status || null,
                     occupation: formData.occupation || null,
                     education: formData.education || null,
-
-                    // Contact Information
                     address: formData.address || null,
                     city: formData.city || null,
                     state: formData.state || null,
                     country: formData.country || null,
                     zip_code: formData.zip_code || null,
-
-                    // Medical Information
                     medical_history: formData.medical_history || null,
                     allergies: formData.allergies || null,
                     current_medications: formData.current_medications || null,
@@ -420,33 +550,21 @@ const Patients = () => {
                     weight: formData.weight || null,
                     height: formData.height || null,
                     bmi: formData.bmi || null,
-
-                    // Emergency Contact
                     emergency_contact: formData.emergency_contact || null,
                     emergency_phone: formData.emergency_phone || null,
                     emergency_relationship: formData.emergency_relationship || null,
-
-                    // Guardian Information
                     guardian_name: formData.guardian_name || null,
                     guardian_phone: formData.guardian_phone || null,
                     guardian_relationship: formData.guardian_relationship || null,
-
-                    // Insurance Information
                     insurance_provider: formData.insurance_provider || null,
                     insurance_policy_number: formData.insurance_policy_number || null,
                     insurance_expiry: formData.insurance_expiry || null,
-
-                    // Referral Information
                     referred_by: formData.referred_by || null,
                     referral_doctor: formData.referral_doctor || null,
                     referral_hospital: formData.referral_hospital || null,
-
-                    // Additional Information
                     preferred_language: formData.preferred_language || null,
                     preferred_contact_method: formData.preferred_contact_method || null,
                     notes: formData.notes || null,
-
-                    // Status
                     status: formData.status || 'Active',
                     updated_at: new Date().toISOString()
                 })
@@ -457,6 +575,7 @@ const Patients = () => {
             setSuccessMsg('✅ Patient updated successfully!');
             setIsEditOpen(false);
             loadPatients();
+            fetchDashboardStats();
             window.dispatchEvent(new Event('patientAdded'));
         } catch (err) {
             setErrorMsg(err.message || 'Failed to update patient.');
@@ -482,6 +601,7 @@ const Patients = () => {
             if (error) throw error;
             setIsDeleteOpen(false);
             loadPatients();
+            fetchDashboardStats();
             window.dispatchEvent(new Event('patientAdded'));
         } catch (err) {
             alert('Failed to delete patient: ' + err.message);
@@ -507,6 +627,7 @@ const Patients = () => {
             setSuccessMsg(`✅ Patient status updated to ${newStatus}`);
             setTimeout(() => setSuccessMsg(''), 3000);
 
+            fetchDashboardStats();
             window.dispatchEvent(new Event('patientAdded'));
             loadPatients();
         } catch (err) {
@@ -637,9 +758,657 @@ const Patients = () => {
     // ===== COUNT ACTIVE FILTERS =====
     const activeFilterCount = (genderFilter ? 1 : 0) + (bloodFilter ? 1 : 0) + (statusFilter ? 1 : 0);
 
+    // ===== RENDER DASHBOARD STATS CARDS =====
+    const renderDashboardStats = () => {
+        const safeStats = {
+            totalPatients: dashboardStats?.totalPatients || 0,
+            newPatients: dashboardStats?.newPatients || 0,
+            activePatients: dashboardStats?.activePatients || 0,
+            inactivePatients: dashboardStats?.inactivePatients || 0,
+            dischargedPatients: dashboardStats?.dischargedPatients || 0,
+            emergencyPatients: dashboardStats?.emergencyPatients || 0,
+            todayAppointments: dashboardStats?.todayAppointments || 0,
+            pendingPrescriptions: dashboardStats?.pendingPrescriptions || 0,
+            totalBeds: dashboardStats?.totalBeds || 0,
+            occupiedBeds: dashboardStats?.occupiedBeds || 0
+        };
+
+        const stats = [
+            {
+                icon: Users,
+                value: safeStats.totalPatients,
+                label: 'Total Patients',
+                color: '#2563EB',
+                bg: '#2563EB15',
+                trend: `+${safeStats.newPatients} this week`
+            },
+            {
+                icon: UserPlus,
+                value: safeStats.newPatients,
+                label: 'New Patients',
+                color: '#22C55E',
+                bg: '#22C55E15',
+                trend: 'Last 7 days'
+            },
+            {
+                icon: UserCheck,
+                value: safeStats.activePatients,
+                label: 'Active Patients',
+                color: '#10B981',
+                bg: '#10B98115',
+                trend: 'Currently active'
+            },
+            {
+                icon: UserX,
+                value: safeStats.inactivePatients + safeStats.dischargedPatients,
+                label: 'Inactive / Discharged',
+                color: '#6B7280',
+                bg: '#6B728015',
+                trend: `${safeStats.dischargedPatients} discharged`
+            },
+            {
+                icon: AlertTriangle,
+                value: safeStats.emergencyPatients,
+                label: 'Emergency Patients',
+                color: '#EF4444',
+                bg: '#EF444415',
+                trend: '⚠️ Urgent care'
+            },
+            {
+                icon: CalendarIcon,
+                value: safeStats.todayAppointments,
+                label: "Today's Appointments",
+                color: '#8B5CF6',
+                bg: '#8B5CF615',
+                trend: 'Scheduled today'
+            },
+            {
+                icon: Pill,
+                value: safeStats.pendingPrescriptions,
+                label: 'Pending Prescriptions',
+                color: '#F59E0B',
+                bg: '#F59E0B15',
+                trend: 'Active prescriptions'
+            },
+            {
+                icon: BedDouble,
+                value: `${safeStats.occupiedBeds}/${safeStats.totalBeds}`,
+                label: 'Bed Occupancy',
+                color: '#EC4899',
+                bg: '#EC489915',
+                trend: `${safeStats.totalBeds > 0 ? Math.round((safeStats.occupiedBeds / safeStats.totalBeds) * 100) : 0}% occupied`
+            }
+        ];
+
+        return (
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                gap: '12px',
+                marginBottom: '20px'
+            }}>
+                {stats.map((stat, index) => {
+                    const Icon = stat.icon;
+                    return (
+                        <div
+                            key={index}
+                            style={{
+                                background: 'var(--card-bg)',
+                                borderRadius: '12px',
+                                padding: '14px 16px',
+                                border: '1px solid var(--border-color)',
+                                transition: 'all 0.3s ease',
+                                boxShadow: 'var(--shadow-sm)'
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+                            }}
+                        >
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                marginBottom: '6px'
+                            }}>
+                                <div style={{
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '8px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    background: stat.bg,
+                                    color: stat.color
+                                }}>
+                                    <Icon size={16} />
+                                </div>
+                                <span style={{
+                                    fontSize: '0.55rem',
+                                    color: 'var(--text-muted)',
+                                    background: 'var(--bg-primary)',
+                                    padding: '1px 6px',
+                                    borderRadius: '8px'
+                                }}>
+                                    {stat.trend}
+                                </span>
+                            </div>
+                            <div style={{
+                                fontSize: '1.1rem',
+                                fontWeight: 700,
+                                color: 'var(--text-primary)',
+                                lineHeight: 1.2
+                            }}>
+                                {stat.value}
+                            </div>
+                            <div style={{
+                                fontSize: '0.65rem',
+                                color: 'var(--text-muted)',
+                                marginTop: '2px'
+                            }}>
+                                {stat.label}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    };
+
+    // ===== EDIT MODAL STATE =====
+    const [isEditOpen, setIsEditOpen] = useState(false);
+
+    // ===== APPOINTMENT DETAIL MODAL =====
+    const renderAppointmentDetailModal = () => {
+        if (!showAppointmentDetail || !selectedAppointment) return null;
+
+        return (
+            <div className="hms-modal-backdrop" onClick={() => setShowAppointmentDetail(false)}>
+                <div className="hms-modal" onClick={(e) => e.stopPropagation()} style={{
+                    maxWidth: '500px',
+                    maxHeight: '90vh',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    background: 'var(--card-bg)',
+                    borderRadius: '16px',
+                    boxShadow: 'var(--shadow-xl)',
+                    border: '1px solid var(--border-color)',
+                    width: '100%',
+                    margin: '16px',
+                    overflow: 'hidden'
+                }}>
+                    <div className="hms-modal-header" style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '16px 20px',
+                        borderBottom: '1px solid var(--border-color)',
+                        background: 'var(--bg-primary)',
+                        borderRadius: '16px 16px 0 0'
+                    }}>
+                        <h3 className="hms-modal-title" style={{
+                            fontSize: '1.1rem',
+                            fontWeight: 600,
+                            margin: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            color: 'var(--text-primary)'
+                        }}>
+                            <Calendar size={20} style={{ color: 'var(--primary-color)' }} />
+                            Appointment Details
+                        </h3>
+                        <button
+                            onClick={() => setShowAppointmentDetail(false)}
+                            style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: 'var(--text-secondary)',
+                                padding: '4px',
+                                borderRadius: '6px',
+                                transition: 'all 0.2s ease'
+                            }}
+                        >
+                            <X size={20} />
+                        </button>
+                    </div>
+
+                    <div className="hms-modal-body" style={{
+                        padding: '20px',
+                        overflowY: 'auto',
+                        flex: 1,
+                        background: 'var(--bg-primary)'
+                    }}>
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 1fr',
+                            gap: '12px'
+                        }}>
+                            <div style={{
+                                padding: '12px',
+                                background: 'var(--card-bg)',
+                                borderRadius: '8px',
+                                border: '1px solid var(--border-color)'
+                            }}>
+                                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Date</div>
+                                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                    {selectedAppointment.appointment_date ? new Date(selectedAppointment.appointment_date).toLocaleDateString('en-US', {
+                                        weekday: 'long',
+                                        month: 'long',
+                                        day: 'numeric',
+                                        year: 'numeric'
+                                    }) : 'N/A'}
+                                </div>
+                            </div>
+                            <div style={{
+                                padding: '12px',
+                                background: 'var(--card-bg)',
+                                borderRadius: '8px',
+                                border: '1px solid var(--border-color)'
+                            }}>
+                                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Time</div>
+                                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                    {selectedAppointment.time_slot || 'N/A'}
+                                </div>
+                            </div>
+                            <div style={{
+                                padding: '12px',
+                                background: 'var(--card-bg)',
+                                borderRadius: '8px',
+                                border: '1px solid var(--border-color)'
+                            }}>
+                                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Doctor</div>
+                                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                    {selectedAppointment.doctors?.name || 'Unknown Doctor'}
+                                </div>
+                                {selectedAppointment.doctors?.specialization && (
+                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                        {selectedAppointment.doctors.specialization}
+                                    </div>
+                                )}
+                            </div>
+                            <div style={{
+                                padding: '12px',
+                                background: 'var(--card-bg)',
+                                borderRadius: '8px',
+                                border: '1px solid var(--border-color)'
+                            }}>
+                                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Status</div>
+                                <div style={{ marginTop: '4px' }}>
+                                    {getAppointmentStatusBadge(selectedAppointment.status)}
+                                </div>
+                            </div>
+                            {selectedAppointment.reason && (
+                                <div style={{
+                                    padding: '12px',
+                                    background: 'var(--card-bg)',
+                                    borderRadius: '8px',
+                                    border: '1px solid var(--border-color)',
+                                    gridColumn: '1 / -1'
+                                }}>
+                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Reason</div>
+                                    <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', marginTop: '2px' }}>
+                                        {selectedAppointment.reason}
+                                    </div>
+                                </div>
+                            )}
+                            {selectedAppointment.notes && (
+                                <div style={{
+                                    padding: '12px',
+                                    background: 'var(--card-bg)',
+                                    borderRadius: '8px',
+                                    border: '1px solid var(--border-color)',
+                                    gridColumn: '1 / -1'
+                                }}>
+                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Notes</div>
+                                    <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', marginTop: '2px' }}>
+                                        {selectedAppointment.notes}
+                                    </div>
+                                </div>
+                            )}
+                            {selectedAppointment.created_at && (
+                                <div style={{
+                                    padding: '12px',
+                                    background: 'var(--card-bg)',
+                                    borderRadius: '8px',
+                                    border: '1px solid var(--border-color)',
+                                    gridColumn: '1 / -1'
+                                }}>
+                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Created At</div>
+                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                        {new Date(selectedAppointment.created_at).toLocaleString()}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="hms-modal-footer" style={{
+                        display: 'flex',
+                        justifyContent: 'flex-end',
+                        gap: '10px',
+                        padding: '14px 20px',
+                        borderTop: '1px solid var(--border-color)',
+                        background: 'var(--bg-primary)',
+                        borderRadius: '0 0 16px 16px'
+                    }}>
+                        <button
+                            onClick={() => setShowAppointmentDetail(false)}
+                            style={{
+                                padding: '8px 20px',
+                                border: '1.5px solid var(--border-color)',
+                                borderRadius: '8px',
+                                background: 'transparent',
+                                cursor: 'pointer',
+                                fontSize: '0.85rem',
+                                fontFamily: 'var(--font-family)',
+                                color: 'var(--text-secondary)',
+                                transition: 'all 0.2s ease'
+                            }}
+                        >
+                            Close
+                        </button>
+                        <button
+                            onClick={() => {
+                                setShowAppointmentDetail(false);
+                                navigate(`/appointments/${selectedAppointment.id}`);
+                            }}
+                            style={{
+                                padding: '8px 20px',
+                                border: 'none',
+                                borderRadius: '8px',
+                                background: 'var(--primary-color)',
+                                cursor: 'pointer',
+                                fontSize: '0.85rem',
+                                fontFamily: 'var(--font-family)',
+                                color: 'white',
+                                fontWeight: 500,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                transition: 'all 0.2s ease'
+                            }}
+                        >
+                            <Edit2 size={16} /> Edit Appointment
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    // ===== PRESCRIPTION DETAIL MODAL - FIXED =====
+    const renderPrescriptionDetailModal = () => {
+        if (!showPrescriptionDetail || !selectedPrescription) return null;
+
+        return (
+            <div className="hms-modal-backdrop" onClick={() => setShowPrescriptionDetail(false)}>
+                <div className="hms-modal" onClick={(e) => e.stopPropagation()} style={{
+                    maxWidth: '550px',
+                    maxHeight: '90vh',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    background: 'var(--card-bg)',
+                    borderRadius: '16px',
+                    boxShadow: 'var(--shadow-xl)',
+                    border: '1px solid var(--border-color)',
+                    width: '100%',
+                    margin: '16px',
+                    overflow: 'hidden'
+                }}>
+                    <div className="hms-modal-header" style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '16px 20px',
+                        borderBottom: '1px solid var(--border-color)',
+                        background: 'var(--bg-primary)',
+                        borderRadius: '16px 16px 0 0'
+                    }}>
+                        <h3 className="hms-modal-title" style={{
+                            fontSize: '1.1rem',
+                            fontWeight: 600,
+                            margin: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            color: 'var(--text-primary)'
+                        }}>
+                            <Pill size={20} style={{ color: 'var(--purple-color)' }} />
+                            Prescription Details
+                        </h3>
+                        <button
+                            onClick={() => setShowPrescriptionDetail(false)}
+                            style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: 'var(--text-secondary)',
+                                padding: '4px',
+                                borderRadius: '6px',
+                                transition: 'all 0.2s ease'
+                            }}
+                        >
+                            <X size={20} />
+                        </button>
+                    </div>
+
+                    <div className="hms-modal-body" style={{
+                        padding: '20px',
+                        overflowY: 'auto',
+                        flex: 1,
+                        background: 'var(--bg-primary)'
+                    }}>
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 1fr',
+                            gap: '12px'
+                        }}>
+                            <div style={{
+                                padding: '12px',
+                                background: 'var(--card-bg)',
+                                borderRadius: '8px',
+                                border: '1px solid var(--border-color)'
+                            }}>
+                                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Diagnosis</div>
+                                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                    {selectedPrescription.diagnosis || 'General Checkup'}
+                                </div>
+                            </div>
+                            <div style={{
+                                padding: '12px',
+                                background: 'var(--card-bg)',
+                                borderRadius: '8px',
+                                border: '1px solid var(--border-color)'
+                            }}>
+                                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Date</div>
+                                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                    {selectedPrescription.date ? new Date(selectedPrescription.date).toLocaleDateString() :
+                                        selectedPrescription.created_at ? new Date(selectedPrescription.created_at).toLocaleDateString() : 'N/A'}
+                                </div>
+                            </div>
+                            <div style={{
+                                padding: '12px',
+                                background: 'var(--card-bg)',
+                                borderRadius: '8px',
+                                border: '1px solid var(--border-color)'
+                            }}>
+                                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Doctor</div>
+                                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                    {selectedPrescription.doctors?.name || 'Unknown Doctor'}
+                                </div>
+                                {selectedPrescription.doctors?.specialization && (
+                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                        {selectedPrescription.doctors.specialization}
+                                    </div>
+                                )}
+                            </div>
+                            <div style={{
+                                padding: '12px',
+                                background: 'var(--card-bg)',
+                                borderRadius: '8px',
+                                border: '1px solid var(--border-color)'
+                            }}>
+                                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Status</div>
+                                <div style={{ marginTop: '4px' }}>
+                                    {getPrescriptionStatusBadge(selectedPrescription.status)}
+                                </div>
+                            </div>
+
+                            {/* Medications */}
+                            {selectedPrescription.medications && (
+                                <div style={{
+                                    padding: '12px',
+                                    background: 'var(--card-bg)',
+                                    borderRadius: '8px',
+                                    border: '1px solid var(--border-color)',
+                                    gridColumn: '1 / -1'
+                                }}>
+                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                                        <Pill size={14} style={{ display: 'inline', marginRight: '4px', color: 'var(--purple-color)' }} />
+                                        Medications
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                        {Array.isArray(selectedPrescription.medications) && selectedPrescription.medications.length > 0 ? (
+                                            selectedPrescription.medications.map((med, idx) => (
+                                                <div key={idx} style={{
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    padding: '6px 10px',
+                                                    background: 'var(--bg-primary)',
+                                                    borderRadius: '4px',
+                                                    border: '1px solid var(--border-color)'
+                                                }}>
+                                                    <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+                                                        {med.name || 'N/A'}
+                                                        {med.dosage && ` (${med.dosage})`}
+                                                    </span>
+                                                    <span style={{ color: 'var(--text-secondary)' }}>
+                                                        {med.frequency && `${med.frequency}`}
+                                                        {med.frequency && med.duration && ' • '}
+                                                        {med.duration && `${med.duration}`}
+                                                    </span>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div style={{ padding: '6px 10px', color: 'var(--text-primary)' }}>
+                                                {typeof selectedPrescription.medications === 'string' ? selectedPrescription.medications : 'No medications listed'}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Instructions */}
+                            {selectedPrescription.instructions && (
+                                <div style={{
+                                    padding: '12px',
+                                    background: 'var(--card-bg)',
+                                    borderRadius: '8px',
+                                    border: '1px solid var(--border-color)',
+                                    gridColumn: '1 / -1'
+                                }}>
+                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Instructions</div>
+                                    <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', marginTop: '4px' }}>
+                                        {selectedPrescription.instructions}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Notes */}
+                            {selectedPrescription.notes && (
+                                <div style={{
+                                    padding: '12px',
+                                    background: 'var(--card-bg)',
+                                    borderRadius: '8px',
+                                    border: '1px solid var(--border-color)',
+                                    gridColumn: '1 / -1'
+                                }}>
+                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Notes</div>
+                                    <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', marginTop: '4px' }}>
+                                        {selectedPrescription.notes}
+                                    </div>
+                                </div>
+                            )}
+
+                            {selectedPrescription.created_at && (
+                                <div style={{
+                                    padding: '12px',
+                                    background: 'var(--card-bg)',
+                                    borderRadius: '8px',
+                                    border: '1px solid var(--border-color)',
+                                    gridColumn: '1 / -1'
+                                }}>
+                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Created At</div>
+                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                        {new Date(selectedPrescription.created_at).toLocaleString()}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="hms-modal-footer" style={{
+                        display: 'flex',
+                        justifyContent: 'flex-end',
+                        gap: '10px',
+                        padding: '14px 20px',
+                        borderTop: '1px solid var(--border-color)',
+                        background: 'var(--bg-primary)',
+                        borderRadius: '0 0 16px 16px'
+                    }}>
+                        <button
+                            onClick={() => setShowPrescriptionDetail(false)}
+                            style={{
+                                padding: '8px 20px',
+                                border: '1.5px solid var(--border-color)',
+                                borderRadius: '8px',
+                                background: 'transparent',
+                                cursor: 'pointer',
+                                fontSize: '0.85rem',
+                                fontFamily: 'var(--font-family)',
+                                color: 'var(--text-secondary)',
+                                transition: 'all 0.2s ease'
+                            }}
+                        >
+                            Close
+                        </button>
+                        <button
+                            onClick={() => {
+                                setShowPrescriptionDetail(false);
+                                navigate(`/prescriptions/${selectedPrescription.id}`);
+                            }}
+                            style={{
+                                padding: '8px 20px',
+                                border: 'none',
+                                borderRadius: '8px',
+                                background: 'var(--primary-color)',
+                                cursor: 'pointer',
+                                fontSize: '0.85rem',
+                                fontFamily: 'var(--font-family)',
+                                color: 'white',
+                                fontWeight: 500,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                transition: 'all 0.2s ease'
+                            }}
+                        >
+                            <Edit2 size={16} /> Edit Prescription
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     // ===== RENDER DETAIL MODAL CONTENT =====
     const renderDetailContent = () => {
-        // IMPORTANT: Agar selectedPatient null hai toh loading show karein
         if (!selectedPatient) {
             return (
                 <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
@@ -723,49 +1492,6 @@ const Patients = () => {
                             </span>
                         </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                        <button
-                            onClick={() => window.print()}
-                            style={{
-                                padding: '6px 12px',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: '6px',
-                                background: 'transparent',
-                                cursor: 'pointer',
-                                fontSize: '0.7rem',
-                                color: 'var(--text-secondary)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px'
-                            }}
-                            onMouseEnter={(e) => { e.target.style.background = 'var(--hover-bg)'; }}
-                            onMouseLeave={(e) => { e.target.style.background = 'transparent'; }}
-                        >
-                            <Printer size={14} /> Print
-                        </button>
-                        <button
-                            onClick={() => {
-                                setIsDetailOpen(false);
-                                openEditModal(selectedPatient);
-                            }}
-                            style={{
-                                padding: '6px 12px',
-                                border: 'none',
-                                borderRadius: '6px',
-                                background: 'var(--primary-color)',
-                                cursor: 'pointer',
-                                fontSize: '0.7rem',
-                                color: 'white',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px'
-                            }}
-                            onMouseEnter={(e) => { e.target.style.background = 'var(--primary-hover)'; }}
-                            onMouseLeave={(e) => { e.target.style.background = 'var(--primary-color)'; }}
-                        >
-                            <Edit2 size={14} /> Edit
-                        </button>
-                    </div>
                 </div>
 
                 {/* Tabs */}
@@ -806,16 +1532,6 @@ const Patients = () => {
                                     transition: 'all 0.2s ease',
                                     borderRadius: '8px 8px 0 0'
                                 }}
-                                onMouseEnter={(e) => {
-                                    if (!isActive) {
-                                        e.target.style.background = 'var(--hover-bg)';
-                                    }
-                                }}
-                                onMouseLeave={(e) => {
-                                    if (!isActive) {
-                                        e.target.style.background = 'transparent';
-                                    }
-                                }}
                             >
                                 <Icon size={16} />
                                 {tab.label}
@@ -824,7 +1540,7 @@ const Patients = () => {
                     })}
                 </div>
 
-                {/* Tab Content - with safe checks for each tab */}
+                {/* Tab Content */}
                 <div style={{ minHeight: '200px' }}>
                     {/* ===== DEMOGRAPHICS TAB ===== */}
                     {activeTab === 'demographics' && (
@@ -833,7 +1549,6 @@ const Patients = () => {
                             gridTemplateColumns: '1fr 1fr',
                             gap: '12px'
                         }}>
-                            {/* Personal Information */}
                             <div style={{
                                 padding: '12px 16px',
                                 background: 'var(--bg-primary)',
@@ -845,7 +1560,7 @@ const Patients = () => {
                                     Full Name
                                 </div>
                                 <div style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)', marginTop: '2px' }}>
-                                    {selectedPatient?.name || 'N/A'}
+                                    {selectedPatient.name}
                                 </div>
                             </div>
                             <div style={{
@@ -859,7 +1574,7 @@ const Patients = () => {
                                     Date of Birth / Age
                                 </div>
                                 <div style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)', marginTop: '2px' }}>
-                                    {selectedPatient?.date_of_birth ? new Date(selectedPatient.date_of_birth).toLocaleDateString() : 'N/A'}
+                                    {new Date(selectedPatient.date_of_birth).toLocaleDateString()}
                                     {age !== 'N/A' && ` (${age} yrs)`}
                                 </div>
                             </div>
@@ -874,7 +1589,7 @@ const Patients = () => {
                                     Gender
                                 </div>
                                 <div style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)', marginTop: '2px' }}>
-                                    {selectedPatient?.gender || 'N/A'}
+                                    {selectedPatient.gender}
                                 </div>
                             </div>
                             <div style={{
@@ -888,21 +1603,7 @@ const Patients = () => {
                                     Phone Number
                                 </div>
                                 <div style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)', marginTop: '2px' }}>
-                                    {selectedPatient?.phone || 'N/A'}
-                                </div>
-                            </div>
-                            <div style={{
-                                padding: '12px 16px',
-                                background: 'var(--bg-primary)',
-                                borderRadius: '8px',
-                                border: '1px solid var(--border-color)'
-                            }}>
-                                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                    <Mail size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                                    Email
-                                </div>
-                                <div style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)', marginTop: '2px' }}>
-                                    {selectedPatient?.email || 'N/A'}
+                                    {selectedPatient.phone}
                                 </div>
                             </div>
                             <div style={{
@@ -916,10 +1617,10 @@ const Patients = () => {
                                     Blood Group
                                 </div>
                                 <div style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)', marginTop: '2px' }}>
-                                    {selectedPatient?.blood_group || 'N/A'}
+                                    {selectedPatient.blood_group}
                                 </div>
                             </div>
-                            {selectedPatient?.cnic && (
+                            {selectedPatient.email && (
                                 <div style={{
                                     padding: '12px 16px',
                                     background: 'var(--bg-primary)',
@@ -927,97 +1628,15 @@ const Patients = () => {
                                     border: '1px solid var(--border-color)'
                                 }}>
                                     <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        <CreditCard size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                                        CNIC / ID
+                                        <Mail size={12} style={{ display: 'inline', marginRight: '4px' }} />
+                                        Email
                                     </div>
                                     <div style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)', marginTop: '2px' }}>
-                                        {selectedPatient.cnic}
+                                        {selectedPatient.email}
                                     </div>
                                 </div>
                             )}
-                            {selectedPatient?.religion && (
-                                <div style={{
-                                    padding: '12px 16px',
-                                    background: 'var(--bg-primary)',
-                                    borderRadius: '8px',
-                                    border: '1px solid var(--border-color)'
-                                }}>
-                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        <Building size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                                        Religion
-                                    </div>
-                                    <div style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)', marginTop: '2px' }}>
-                                        {selectedPatient.religion}
-                                    </div>
-                                </div>
-                            )}
-                            {selectedPatient?.nationality && (
-                                <div style={{
-                                    padding: '12px 16px',
-                                    background: 'var(--bg-primary)',
-                                    borderRadius: '8px',
-                                    border: '1px solid var(--border-color)'
-                                }}>
-                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        <Globe size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                                        Nationality
-                                    </div>
-                                    <div style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)', marginTop: '2px' }}>
-                                        {selectedPatient.nationality}
-                                    </div>
-                                </div>
-                            )}
-                            {selectedPatient?.marital_status && (
-                                <div style={{
-                                    padding: '12px 16px',
-                                    background: 'var(--bg-primary)',
-                                    borderRadius: '8px',
-                                    border: '1px solid var(--border-color)'
-                                }}>
-                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        <Users size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                                        Marital Status
-                                    </div>
-                                    <div style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)', marginTop: '2px' }}>
-                                        {selectedPatient.marital_status}
-                                    </div>
-                                </div>
-                            )}
-                            {selectedPatient?.occupation && (
-                                <div style={{
-                                    padding: '12px 16px',
-                                    background: 'var(--bg-primary)',
-                                    borderRadius: '8px',
-                                    border: '1px solid var(--border-color)'
-                                }}>
-                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        <Briefcase size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                                        Occupation
-                                    </div>
-                                    <div style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)', marginTop: '2px' }}>
-                                        {selectedPatient.occupation}
-                                    </div>
-                                </div>
-                            )}
-                            {selectedPatient?.education && (
-                                <div style={{
-                                    padding: '12px 16px',
-                                    background: 'var(--bg-primary)',
-                                    borderRadius: '8px',
-                                    border: '1px solid var(--border-color)'
-                                }}>
-                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        <GraduationCap size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                                        Education
-                                    </div>
-                                    <div style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)', marginTop: '2px' }}>
-                                        {selectedPatient.education}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Address */}
-                            {selectedPatient?.address && (
+                            {selectedPatient.address && (
                                 <div style={{
                                     padding: '12px 16px',
                                     background: 'var(--bg-primary)',
@@ -1034,13 +1653,10 @@ const Patients = () => {
                                         {selectedPatient.city && `, ${selectedPatient.city}`}
                                         {selectedPatient.state && `, ${selectedPatient.state}`}
                                         {selectedPatient.country && `, ${selectedPatient.country}`}
-                                        {selectedPatient.zip_code && ` - ${selectedPatient.zip_code}`}
                                     </div>
                                 </div>
                             )}
-
-                            {/* Emergency Contact */}
-                            {selectedPatient?.emergency_contact && (
+                            {selectedPatient.emergency_contact && (
                                 <div style={{
                                     padding: '12px 16px',
                                     background: 'var(--bg-primary)',
@@ -1059,123 +1675,7 @@ const Patients = () => {
                                     </div>
                                 </div>
                             )}
-
-                            {/* Guardian Information */}
-                            {selectedPatient?.guardian_name && (
-                                <div style={{
-                                    padding: '12px 16px',
-                                    background: 'var(--bg-primary)',
-                                    borderRadius: '8px',
-                                    border: '1px solid var(--border-color)',
-                                    gridColumn: '1 / -1'
-                                }}>
-                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        <Shield size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                                        Guardian Information
-                                    </div>
-                                    <div style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)', marginTop: '2px' }}>
-                                        {selectedPatient.guardian_name}
-                                        {selectedPatient.guardian_relationship && ` (${selectedPatient.guardian_relationship})`}
-                                        {selectedPatient.guardian_phone && ` - ${selectedPatient.guardian_phone}`}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Insurance Information */}
-                            {selectedPatient?.insurance_provider && (
-                                <div style={{
-                                    padding: '12px 16px',
-                                    background: 'var(--bg-primary)',
-                                    borderRadius: '8px',
-                                    border: '1px solid var(--border-color)',
-                                    gridColumn: '1 / -1'
-                                }}>
-                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        <CreditCard size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                                        Insurance Information
-                                    </div>
-                                    <div style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)', marginTop: '2px' }}>
-                                        {selectedPatient.insurance_provider}
-                                        {selectedPatient.insurance_policy_number && ` - Policy: ${selectedPatient.insurance_policy_number}`}
-                                        {selectedPatient.insurance_expiry && ` (Expires: ${new Date(selectedPatient.insurance_expiry).toLocaleDateString()})`}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Referral Information */}
-                            {selectedPatient?.referred_by && (
-                                <div style={{
-                                    padding: '12px 16px',
-                                    background: 'var(--bg-primary)',
-                                    borderRadius: '8px',
-                                    border: '1px solid var(--border-color)',
-                                    gridColumn: '1 / -1'
-                                }}>
-                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        <StethoscopeIcon size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                                        Referral Information
-                                    </div>
-                                    <div style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)', marginTop: '2px' }}>
-                                        {selectedPatient.referred_by && `Referred By: ${selectedPatient.referred_by}`}
-                                        {selectedPatient.referral_doctor && `, Doctor: ${selectedPatient.referral_doctor}`}
-                                        {selectedPatient.referral_hospital && `, Hospital: ${selectedPatient.referral_hospital}`}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Additional Info */}
-                            {selectedPatient?.preferred_language && (
-                                <div style={{
-                                    padding: '12px 16px',
-                                    background: 'var(--bg-primary)',
-                                    borderRadius: '8px',
-                                    border: '1px solid var(--border-color)'
-                                }}>
-                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        <Languages size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                                        Preferred Language
-                                    </div>
-                                    <div style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)', marginTop: '2px' }}>
-                                        {selectedPatient.preferred_language}
-                                    </div>
-                                </div>
-                            )}
-                            {selectedPatient?.preferred_contact_method && (
-                                <div style={{
-                                    padding: '12px 16px',
-                                    background: 'var(--bg-primary)',
-                                    borderRadius: '8px',
-                                    border: '1px solid var(--border-color)'
-                                }}>
-                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        <MessageCircle size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                                        Preferred Contact
-                                    </div>
-                                    <div style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)', marginTop: '2px' }}>
-                                        {selectedPatient.preferred_contact_method}
-                                    </div>
-                                </div>
-                            )}
-                            {selectedPatient?.notes && (
-                                <div style={{
-                                    padding: '12px 16px',
-                                    background: 'var(--bg-primary)',
-                                    borderRadius: '8px',
-                                    border: '1px solid var(--border-color)',
-                                    gridColumn: '1 / -1'
-                                }}>
-                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        <FileText size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                                        Additional Notes
-                                    </div>
-                                    <div style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)', marginTop: '2px' }}>
-                                        {selectedPatient.notes}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Registration Date */}
-                            {selectedPatient?.created_at && (
+                            {selectedPatient.created_at && (
                                 <div style={{
                                     padding: '12px 16px',
                                     background: 'var(--bg-primary)',
@@ -1195,7 +1695,7 @@ const Patients = () => {
                         </div>
                     )}
 
-                    {/* ===== MEDICAL HISTORY TAB - FIXED ===== */}
+                    {/* ===== MEDICAL TAB ===== */}
                     {activeTab === 'medical' && selectedPatient && (
                         <div style={{
                             padding: '16px',
@@ -1210,189 +1710,79 @@ const Patients = () => {
                                     Medical Information
                                 </h4>
                             </div>
-
                             <div style={{
                                 display: 'grid',
                                 gridTemplateColumns: '1fr 1fr',
                                 gap: '12px'
                             }}>
-                                {/* Medical History */}
-                                <div style={{
-                                    padding: '10px 14px',
-                                    background: 'var(--card-bg)',
-                                    borderRadius: '6px',
-                                    border: '1px solid var(--border-color)',
-                                    gridColumn: '1 / -1'
-                                }}>
-                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        <FileText size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                                        Medical History
+                                {selectedPatient.medical_history && (
+                                    <div style={{
+                                        padding: '10px 14px',
+                                        background: 'var(--card-bg)',
+                                        borderRadius: '6px',
+                                        border: '1px solid var(--border-color)',
+                                        gridColumn: '1 / -1'
+                                    }}>
+                                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                            <FileText size={12} style={{ display: 'inline', marginRight: '4px' }} />
+                                            Medical History
+                                        </div>
+                                        <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', marginTop: '2px' }}>
+                                            {selectedPatient.medical_history}
+                                        </div>
                                     </div>
-                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', marginTop: '2px' }}>
-                                        {selectedPatient.medical_history || 'No medical history recorded'}
+                                )}
+                                {selectedPatient.allergies && (
+                                    <div style={{
+                                        padding: '10px 14px',
+                                        background: 'var(--card-bg)',
+                                        borderRadius: '6px',
+                                        border: '1px solid var(--border-color)',
+                                        gridColumn: '1 / -1'
+                                    }}>
+                                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                            <AlertCircle size={12} style={{ display: 'inline', marginRight: '4px' }} />
+                                            Allergies
+                                        </div>
+                                        <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', marginTop: '2px' }}>
+                                            {selectedPatient.allergies}
+                                        </div>
                                     </div>
-                                </div>
-
-                                {/* Allergies */}
-                                <div style={{
-                                    padding: '10px 14px',
-                                    background: 'var(--card-bg)',
-                                    borderRadius: '6px',
-                                    border: '1px solid var(--border-color)',
-                                    gridColumn: '1 / -1'
-                                }}>
-                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        <AlertCircle size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                                        Allergies
+                                )}
+                                {selectedPatient.current_medications && (
+                                    <div style={{
+                                        padding: '10px 14px',
+                                        background: 'var(--card-bg)',
+                                        borderRadius: '6px',
+                                        border: '1px solid var(--border-color)',
+                                        gridColumn: '1 / -1'
+                                    }}>
+                                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                            <Pill size={12} style={{ display: 'inline', marginRight: '4px' }} />
+                                            Current Medications
+                                        </div>
+                                        <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', marginTop: '2px' }}>
+                                            {selectedPatient.current_medications}
+                                        </div>
                                     </div>
-                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', marginTop: '2px' }}>
-                                        {selectedPatient.allergies || 'No allergies recorded'}
+                                )}
+                                {selectedPatient.chronic_conditions && (
+                                    <div style={{
+                                        padding: '10px 14px',
+                                        background: 'var(--card-bg)',
+                                        borderRadius: '6px',
+                                        border: '1px solid var(--border-color)',
+                                        gridColumn: '1 / -1'
+                                    }}>
+                                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                            <Activity size={12} style={{ display: 'inline', marginRight: '4px' }} />
+                                            Chronic Conditions
+                                        </div>
+                                        <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', marginTop: '2px' }}>
+                                            {selectedPatient.chronic_conditions}
+                                        </div>
                                     </div>
-                                </div>
-
-                                {/* Current Medications */}
-                                <div style={{
-                                    padding: '10px 14px',
-                                    background: 'var(--card-bg)',
-                                    borderRadius: '6px',
-                                    border: '1px solid var(--border-color)',
-                                    gridColumn: '1 / -1'
-                                }}>
-                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        <Pill size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                                        Current Medications
-                                    </div>
-                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', marginTop: '2px' }}>
-                                        {selectedPatient.current_medications || 'No current medications recorded'}
-                                    </div>
-                                </div>
-
-                                {/* Chronic Conditions */}
-                                <div style={{
-                                    padding: '10px 14px',
-                                    background: 'var(--card-bg)',
-                                    borderRadius: '6px',
-                                    border: '1px solid var(--border-color)',
-                                    gridColumn: '1 / -1'
-                                }}>
-                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        <Activity size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                                        Chronic Conditions
-                                    </div>
-                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', marginTop: '2px' }}>
-                                        {selectedPatient.chronic_conditions || 'No chronic conditions recorded'}
-                                    </div>
-                                </div>
-
-                                {/* Past Surgeries */}
-                                <div style={{
-                                    padding: '10px 14px',
-                                    background: 'var(--card-bg)',
-                                    borderRadius: '6px',
-                                    border: '1px solid var(--border-color)',
-                                    gridColumn: '1 / -1'
-                                }}>
-                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        <Scissors size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                                        Past Surgeries
-                                    </div>
-                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', marginTop: '2px' }}>
-                                        {selectedPatient.past_surgeries || 'No past surgeries recorded'}
-                                    </div>
-                                </div>
-
-                                {/* Family History */}
-                                <div style={{
-                                    padding: '10px 14px',
-                                    background: 'var(--card-bg)',
-                                    borderRadius: '6px',
-                                    border: '1px solid var(--border-color)',
-                                    gridColumn: '1 / -1'
-                                }}>
-                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        <Users size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                                        Family History
-                                    </div>
-                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', marginTop: '2px' }}>
-                                        {selectedPatient.family_history || 'No family history recorded'}
-                                    </div>
-                                </div>
-
-                                {/* Vitals */}
-                                <div style={{
-                                    padding: '10px 14px',
-                                    background: 'var(--card-bg)',
-                                    borderRadius: '6px',
-                                    border: '1px solid var(--border-color)'
-                                }}>
-                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        <Activity size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                                        Blood Pressure
-                                    </div>
-                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', marginTop: '2px' }}>
-                                        {selectedPatient.blood_pressure || 'N/A'}
-                                    </div>
-                                </div>
-                                <div style={{
-                                    padding: '10px 14px',
-                                    background: 'var(--card-bg)',
-                                    borderRadius: '6px',
-                                    border: '1px solid var(--border-color)'
-                                }}>
-                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        <Droplet size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                                        Blood Sugar
-                                    </div>
-                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', marginTop: '2px' }}>
-                                        {selectedPatient.blood_sugar || 'N/A'}
-                                    </div>
-                                </div>
-                                <div style={{
-                                    padding: '10px 14px',
-                                    background: 'var(--card-bg)',
-                                    borderRadius: '6px',
-                                    border: '1px solid var(--border-color)'
-                                }}>
-                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        <Activity size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                                        Weight / Height
-                                    </div>
-                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', marginTop: '2px' }}>
-                                        {selectedPatient.weight ? `${selectedPatient.weight} kg` : 'N/A'} / {selectedPatient.height ? `${selectedPatient.height} cm` : 'N/A'}
-                                        {selectedPatient.bmi && ` (BMI: ${selectedPatient.bmi})`}
-                                    </div>
-                                </div>
-                                <div style={{
-                                    padding: '10px 14px',
-                                    background: 'var(--card-bg)',
-                                    borderRadius: '6px',
-                                    border: '1px solid var(--border-color)'
-                                }}>
-                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        <Activity size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                                        Smoking / Alcohol
-                                    </div>
-                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', marginTop: '2px' }}>
-                                        {selectedPatient.smoking_status || 'N/A'} / {selectedPatient.alcohol_consumption || 'N/A'}
-                                    </div>
-                                </div>
-
-                                {/* Status */}
-                                <div style={{
-                                    padding: '10px 14px',
-                                    background: 'var(--card-bg)',
-                                    borderRadius: '6px',
-                                    border: '1px solid var(--border-color)',
-                                    gridColumn: '1 / -1'
-                                }}>
-                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        <Clock size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                                        Patient Status
-                                    </div>
-                                    <div style={{ marginTop: '2px' }}>
-                                        {getStatusBadge(selectedPatient.status || 'Active', selectedPatient.id)}
-                                    </div>
-                                </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -1406,14 +1796,21 @@ const Patients = () => {
                             border: '1px solid var(--border-color)',
                             minHeight: '150px'
                         }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                            <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                marginBottom: '12px',
+                                flexWrap: 'wrap',
+                                gap: '8px'
+                            }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <Calendar size={18} style={{ color: 'var(--primary-color)' }} />
                                     <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                                         Appointments
                                     </h4>
                                     <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                                        ({patientAppointments.length})
+                                        ({patientAppointments?.length || 0})
                                     </span>
                                 </div>
                                 <button
@@ -1444,7 +1841,7 @@ const Patients = () => {
                                     <div className="spinner" style={{ margin: '0 auto 8px' }}>⏳</div>
                                     Loading appointments...
                                 </div>
-                            ) : patientAppointments.length === 0 ? (
+                            ) : !patientAppointments || patientAppointments.length === 0 ? (
                                 <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>
                                     <Calendar size={32} style={{ marginBottom: '8px', opacity: 0.5 }} />
                                     <p>No appointments found for this patient.</p>
@@ -1492,16 +1889,16 @@ const Patients = () => {
                                                     fontSize: '0.8rem',
                                                     fontWeight: 600
                                                 }}>
-                                                    {new Date(appt.appointment_date).getDate()}
+                                                    {appt.appointment_date ? new Date(appt.appointment_date).getDate() : '?'}
                                                 </div>
                                                 <div>
                                                     <div style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)' }}>
-                                                        {new Date(appt.appointment_date).toLocaleDateString('en-US', {
+                                                        {appt.appointment_date ? new Date(appt.appointment_date).toLocaleDateString('en-US', {
                                                             weekday: 'short',
                                                             month: 'short',
                                                             day: 'numeric',
                                                             year: 'numeric'
-                                                        })}
+                                                        }) : 'N/A'}
                                                     </div>
                                                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                                                         <Clock size={12} style={{ display: 'inline' }} />
@@ -1525,7 +1922,10 @@ const Patients = () => {
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                 {getAppointmentStatusBadge(appt.status)}
                                                 <button
-                                                    onClick={() => navigate(`/appointments`)}
+                                                    onClick={() => {
+                                                        setSelectedAppointment(appt);
+                                                        setShowAppointmentDetail(true);
+                                                    }}
                                                     style={{
                                                         padding: '2px 8px',
                                                         border: '1px solid var(--border-color)',
@@ -1533,12 +1933,16 @@ const Patients = () => {
                                                         background: 'transparent',
                                                         cursor: 'pointer',
                                                         fontSize: '0.6rem',
-                                                        color: 'var(--text-secondary)'
+                                                        color: 'var(--text-secondary)',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px',
+                                                        transition: 'all 0.2s ease'
                                                     }}
                                                     onMouseEnter={(e) => { e.target.style.background = 'var(--hover-bg)'; }}
                                                     onMouseLeave={(e) => { e.target.style.background = 'transparent'; }}
                                                 >
-                                                    View
+                                                    <Eye size={12} /> View
                                                 </button>
                                             </div>
                                         </div>
@@ -1548,7 +1952,7 @@ const Patients = () => {
                         </div>
                     )}
 
-                    {/* ===== PRESCRIPTIONS TAB ===== */}
+                    {/* ===== PRESCRIPTIONS TAB - FIXED ===== */}
                     {activeTab === 'prescriptions' && selectedPatient && (
                         <div style={{
                             padding: '16px',
@@ -1557,14 +1961,21 @@ const Patients = () => {
                             border: '1px solid var(--border-color)',
                             minHeight: '150px'
                         }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                            <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                marginBottom: '12px',
+                                flexWrap: 'wrap',
+                                gap: '8px'
+                            }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <Pill size={18} style={{ color: 'var(--primary-color)' }} />
+                                    <Pill size={18} style={{ color: 'var(--purple-color)' }} />
                                     <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                                         Prescriptions
                                     </h4>
                                     <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                                        ({patientPrescriptions.length})
+                                        ({patientPrescriptions?.length || 0})
                                     </span>
                                 </div>
                                 <button
@@ -1595,7 +2006,7 @@ const Patients = () => {
                                     <div className="spinner" style={{ margin: '0 auto 8px' }}>⏳</div>
                                     Loading prescriptions...
                                 </div>
-                            ) : patientPrescriptions.length === 0 ? (
+                            ) : !patientPrescriptions || patientPrescriptions.length === 0 ? (
                                 <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>
                                     <Pill size={32} style={{ marginBottom: '8px', opacity: 0.5 }} />
                                     <p>No prescriptions found for this patient.</p>
@@ -1623,28 +2034,57 @@ const Patients = () => {
                                             padding: '10px 14px',
                                             background: 'var(--card-bg)',
                                             borderRadius: '8px',
-                                            border: '1px solid var(--border-color)'
-                                        }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
+                                            border: '1px solid var(--border-color)',
+                                            transition: 'all 0.2s ease'
+                                        }}
+                                            onMouseEnter={(e) => { e.target.style.background = 'var(--hover-bg)'; }}
+                                            onMouseLeave={(e) => { e.target.style.background = 'transparent'; }}
+                                        >
+                                            <div style={{
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'flex-start',
+                                                flexWrap: 'wrap',
+                                                gap: '8px'
+                                            }}>
                                                 <div style={{ flex: 1 }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                                        <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)' }}>
+                                                    <div style={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '8px',
+                                                        flexWrap: 'wrap'
+                                                    }}>
+                                                        <span style={{
+                                                            fontSize: '0.85rem',
+                                                            fontWeight: 500,
+                                                            color: 'var(--text-primary)'
+                                                        }}>
                                                             {presc.diagnosis || 'General Checkup'}
                                                         </span>
                                                         {getPrescriptionStatusBadge(presc.status)}
                                                     </div>
-                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                    <div style={{
+                                                        fontSize: '0.75rem',
+                                                        color: 'var(--text-muted)',
+                                                        marginTop: '4px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '8px',
+                                                        flexWrap: 'wrap'
+                                                    }}>
                                                         <Calendar size={12} style={{ display: 'inline' }} />
-                                                        {presc.date ? new Date(presc.date).toLocaleDateString() : 'N/A'}
-                                                        <span style={{ color: 'var(--text-muted)' }}>•</span>
-                                                        <Stethoscope size={12} style={{ display: 'inline' }} />
-                                                        {presc.doctors?.name || 'Unknown Doctor'}
-                                                        {presc.doctors?.specialization && (
-                                                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                                                                ({presc.doctors.specialization})
-                                                            </span>
+                                                        {presc.date ? new Date(presc.date).toLocaleDateString() :
+                                                            presc.created_at ? new Date(presc.created_at).toLocaleDateString() : 'N/A'}
+                                                        {presc.doctors?.name && (
+                                                            <>
+                                                                <span style={{ color: 'var(--text-muted)' }}>•</span>
+                                                                <Stethoscope size={12} style={{ display: 'inline' }} />
+                                                                {presc.doctors.name}
+                                                            </>
                                                         )}
                                                     </div>
+
+                                                    {/* Medications Display */}
                                                     {presc.medications && (
                                                         <div style={{
                                                             fontSize: '0.75rem',
@@ -1656,12 +2096,40 @@ const Patients = () => {
                                                             border: '1px solid var(--border-color)'
                                                         }}>
                                                             <Pill size={12} style={{ display: 'inline', marginRight: '4px', color: 'var(--purple-color)' }} />
-                                                            {presc.medications}
+                                                            {Array.isArray(presc.medications) && presc.medications.length > 0 ? (
+                                                                presc.medications.map((med, idx) => (
+                                                                    <span key={idx}>
+                                                                        {med.name || 'N/A'}
+                                                                        {med.dosage && `(${med.dosage})`}
+                                                                        {idx < presc.medications.length - 1 && ', '}
+                                                                    </span>
+                                                                ))
+                                                            ) : (
+                                                                typeof presc.medications === 'string' ? presc.medications : 'No medications'
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Instructions */}
+                                                    {presc.instructions && (
+                                                        <div style={{
+                                                            fontSize: '0.7rem',
+                                                            color: 'var(--text-muted)',
+                                                            marginTop: '4px',
+                                                            padding: '4px 8px',
+                                                            background: '#FEF3C7',
+                                                            borderRadius: '4px',
+                                                            border: '1px solid #F59E0B30'
+                                                        }}>
+                                                            <span style={{ fontWeight: 500 }}>📋 Instructions:</span> {presc.instructions}
                                                         </div>
                                                     )}
                                                 </div>
                                                 <button
-                                                    onClick={() => navigate(`/prescriptions`)}
+                                                    onClick={() => {
+                                                        setSelectedPrescription(presc);
+                                                        setShowPrescriptionDetail(true);
+                                                    }}
                                                     style={{
                                                         padding: '2px 10px',
                                                         border: '1px solid var(--border-color)',
@@ -1672,7 +2140,8 @@ const Patients = () => {
                                                         color: 'var(--text-secondary)',
                                                         display: 'flex',
                                                         alignItems: 'center',
-                                                        gap: '4px'
+                                                        gap: '4px',
+                                                        transition: 'all 0.2s ease'
                                                     }}
                                                     onMouseEnter={(e) => { e.target.style.background = 'var(--hover-bg)'; }}
                                                     onMouseLeave={(e) => { e.target.style.background = 'transparent'; }}
@@ -1690,9 +2159,6 @@ const Patients = () => {
             </div>
         );
     };
-
-    // ===== EDIT MODAL STATE =====
-    const [isEditOpen, setIsEditOpen] = useState(false);
 
     // ===== RENDER EDIT MODAL =====
     const renderEditModal = () => {
@@ -2336,6 +2802,7 @@ const Patients = () => {
         );
     };
 
+    // ===== MAIN RENDER =====
     return (
         <DashboardLayout active="patients" title="Patient Management">
             {/* ===== BACK BUTTON ===== */}
@@ -2369,6 +2836,9 @@ const Patients = () => {
                 </button>
             </div>
 
+            {/* ===== DASHBOARD STATS CARDS ===== */}
+            {renderDashboardStats()}
+
             {/* ===== CONTROLS BAR ===== */}
             <div className="hms-controls-bar" style={{
                 display: 'flex',
@@ -2376,10 +2846,20 @@ const Patients = () => {
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 gap: '12px',
-                padding: '14px 18px'
+                padding: '14px 18px',
+                background: 'var(--card-bg)',
+                borderRadius: '12px',
+                border: '1px solid var(--border-color)',
+                marginBottom: '16px'
             }}>
-                <div className="hms-search-box" style={{ flex: 1, minWidth: '200px' }}>
-                    <Search size={18} className="hms-search-icon" />
+                <div className="hms-search-box" style={{ flex: 1, minWidth: '200px', position: 'relative' }}>
+                    <Search size={18} className="hms-search-icon" style={{
+                        position: 'absolute',
+                        left: '12px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        color: 'var(--text-muted)'
+                    }} />
                     <input
                         type="text"
                         placeholder="Search by name, phone..."
@@ -2396,6 +2876,14 @@ const Patients = () => {
                             color: 'var(--text-primary)',
                             outline: 'none',
                             transition: 'all 0.2s ease'
+                        }}
+                        onFocus={(e) => {
+                            e.target.style.borderColor = 'var(--primary-color)';
+                            e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)';
+                        }}
+                        onBlur={(e) => {
+                            e.target.style.borderColor = 'var(--border-color)';
+                            e.target.style.boxShadow = 'none';
                         }}
                     />
                 </div>
@@ -2581,18 +3069,38 @@ const Patients = () => {
 
             {/* ===== SUCCESS / ERROR MESSAGES ===== */}
             {successMsg && (
-                <div className="alert alert-success" style={{ marginBottom: '16px', borderRadius: '8px', padding: '12px 16px' }}>
+                <div className="alert alert-success" style={{
+                    marginBottom: '16px',
+                    borderRadius: '8px',
+                    padding: '12px 16px',
+                    background: '#22C55E15',
+                    border: '1px solid #22C55E30',
+                    color: '#16A34A'
+                }}>
                     {successMsg}
                 </div>
             )}
             {errorMsg && (
-                <div className="alert alert-danger" style={{ marginBottom: '16px', borderRadius: '8px', padding: '12px 16px' }}>
+                <div className="alert alert-danger" style={{
+                    marginBottom: '16px',
+                    borderRadius: '8px',
+                    padding: '12px 16px',
+                    background: '#EF444415',
+                    border: '1px solid #EF444430',
+                    color: '#DC2626'
+                }}>
                     {errorMsg}
                 </div>
             )}
 
             {/* ===== PATIENTS TABLE ===== */}
-            <div className="hms-table-container" style={{ borderRadius: '12px', overflow: 'hidden' }}>
+            <div className="hms-table-container" style={{
+                borderRadius: '12px',
+                overflow: 'hidden',
+                background: 'var(--card-bg)',
+                border: '1px solid var(--border-color)',
+                boxShadow: 'var(--shadow-sm)'
+            }}>
                 {loading ? (
                     <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
                         <div className="spinner" style={{ margin: '0 auto 12px' }}>⏳</div>
@@ -2601,12 +3109,10 @@ const Patients = () => {
                 ) : patients.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
                         <div style={{ fontSize: '3rem', marginBottom: '12px' }}>👤</div>
-                        No patient records found.
-                        {activeFilterCount > 0 && (
-                            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '8px' }}>
-                                Try clearing your filters to see all patients.
-                            </p>
-                        )}
+                        <h3 style={{ color: 'var(--text-primary)', marginBottom: '4px' }}>No Patient Records Found</h3>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                            {activeFilterCount > 0 ? 'Try clearing your filters to see all patients.' : 'Start by adding your first patient.'}
+                        </p>
                         <br />
                         <button
                             onClick={goToAddPatient}
@@ -2622,7 +3128,8 @@ const Patients = () => {
                                 fontFamily: 'var(--font-family)',
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '6px'
+                                gap: '6px',
+                                transition: 'all 0.2s ease'
                             }}
                             onMouseEnter={(e) => e.target.style.background = 'var(--primary-hover)'}
                             onMouseLeave={(e) => e.target.style.background = 'var(--primary-color)'}
@@ -2631,71 +3138,155 @@ const Patients = () => {
                         </button>
                     </div>
                 ) : (
-                    <table className="hms-table">
-                        <thead>
-                            <tr>
-                                <th style={{ padding: '12px 16px', fontSize: '0.7rem' }}>Name</th>
-                                <th style={{ padding: '12px 16px', fontSize: '0.7rem' }}>Contact</th>
-                                <th style={{ padding: '12px 16px', fontSize: '0.7rem' }}>D.O.B</th>
-                                <th style={{ padding: '12px 16px', fontSize: '0.7rem' }}>Gender</th>
-                                <th style={{ padding: '12px 16px', fontSize: '0.7rem' }}>Blood</th>
-                                <th style={{ padding: '12px 16px', fontSize: '0.7rem' }}>Status</th>
-                                <th style={{ padding: '12px 16px', fontSize: '0.7rem', textAlign: 'right' }}>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {patients.map((patient) => (
-                                <tr key={patient.id}>
-                                    <td style={{ padding: '12px 16px' }}>
-                                        <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{patient.name}</div>
-                                    </td>
-                                    <td style={{ padding: '12px 16px' }}>
-                                        <div style={{ fontSize: '0.85rem' }}>{patient.phone}</div>
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{patient.email || 'N/A'}</div>
-                                    </td>
-                                    <td style={{ padding: '12px 16px', fontSize: '0.85rem' }}>
-                                        {patient.date_of_birth ? new Date(patient.date_of_birth).toLocaleDateString() : 'N/A'}
-                                    </td>
-                                    <td style={{ padding: '12px 16px' }}>
-                                        <span className={`hms-badge ${patient.gender === 'Male' ? 'info' : patient.gender === 'Female' ? 'success' : 'secondary'}`}
-                                            style={{ padding: '2px 12px', borderRadius: '12px', fontSize: '0.7rem' }}>
-                                            {patient.gender || 'N/A'}
-                                        </span>
-                                    </td>
-                                    <td style={{ padding: '12px 16px' }}>
-                                        <span className="hms-badge warning" style={{ padding: '2px 12px', borderRadius: '12px', fontSize: '0.7rem', fontWeight: 700 }}>
-                                            {patient.blood_group || 'N/A'}
-                                        </span>
-                                    </td>
-                                    <td style={{ padding: '12px 16px' }}>
-                                        {getStatusBadge(patient.status, patient.id)}
-                                    </td>
-                                    <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                                        <div className="hms-actions" style={{ justifyContent: 'flex-end', gap: '6px', flexWrap: 'wrap' }}>
-                                            <button className="hms-action-btn view" title="View Details" onClick={() => openDetailModal(patient)}
-                                                style={{ padding: '6px', borderRadius: '6px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-secondary)' }}>
-                                                <Eye size={16} />
-                                            </button>
-                                            <button className="hms-action-btn edit" title="Edit Patient" onClick={() => openEditModal(patient)}
-                                                style={{ padding: '6px', borderRadius: '6px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-secondary)' }}>
-                                                <Edit2 size={16} />
-                                            </button>
-                                            <button className="hms-action-btn delete" title="Delete Patient" onClick={() => openDeleteModal(patient)}
-                                                style={{ padding: '6px', borderRadius: '6px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-secondary)' }}>
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </div>
-                                    </td>
+                    <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                        <table className="hms-table" style={{
+                            width: '100%',
+                            borderCollapse: 'collapse',
+                            fontSize: '0.8rem',
+                            minWidth: '700px'
+                        }}>
+                            <thead>
+                                <tr>
+                                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>
+                                        <User size={14} style={{ display: 'inline', marginRight: '4px', color: 'var(--text-muted)' }} />
+                                        Name
+                                    </th>
+                                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>
+                                        <Phone size={14} style={{ display: 'inline', marginRight: '4px', color: 'var(--text-muted)' }} />
+                                        Contact
+                                    </th>
+                                    <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>
+                                        <Calendar size={14} style={{ display: 'inline', marginRight: '4px', color: 'var(--text-muted)' }} />
+                                        D.O.B
+                                    </th>
+                                    <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>
+                                        <User size={14} style={{ display: 'inline', marginRight: '4px', color: 'var(--text-muted)' }} />
+                                        Gender
+                                    </th>
+                                    <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>
+                                        <Heart size={14} style={{ display: 'inline', marginRight: '4px', color: 'var(--text-muted)' }} />
+                                        Blood
+                                    </th>
+                                    <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>
+                                        Status
+                                    </th>
+                                    <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>
+                                        Actions
+                                    </th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {patients.map((patient) => (
+                                    <tr key={patient.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s ease' }}
+                                        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--hover-bg)'}
+                                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                    >
+                                        <td style={{ padding: '12px 16px' }}>
+                                            <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{patient.name}</div>
+                                        </td>
+                                        <td style={{ padding: '12px 16px' }}>
+                                            <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>{patient.phone}</div>
+                                            {patient.email && (
+                                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{patient.email}</div>
+                                            )}
+                                        </td>
+                                        <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                                            {patient.date_of_birth ? new Date(patient.date_of_birth).toLocaleDateString() : 'N/A'}
+                                        </td>
+                                        <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                            <span className={`hms-badge ${patient.gender === 'Male' ? 'info' : patient.gender === 'Female' ? 'success' : 'secondary'}`}
+                                                style={{ padding: '2px 12px', borderRadius: '12px', fontSize: '0.7rem' }}>
+                                                {patient.gender || 'N/A'}
+                                            </span>
+                                        </td>
+                                        <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                            <span className="hms-badge warning" style={{ padding: '2px 12px', borderRadius: '12px', fontSize: '0.7rem', fontWeight: 700 }}>
+                                                {patient.blood_group || 'N/A'}
+                                            </span>
+                                        </td>
+                                        <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                            {getStatusBadge(patient.status || 'Active', patient.id)}
+                                        </td>
+                                        <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                                            <div className="hms-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px', flexWrap: 'wrap' }}>
+                                                <button
+                                                    className="hms-action-btn view"
+                                                    title="View Details"
+                                                    onClick={() => openDetailModal(patient)}
+                                                    style={{
+                                                        padding: '6px',
+                                                        borderRadius: '6px',
+                                                        border: 'none',
+                                                        background: 'transparent',
+                                                        cursor: 'pointer',
+                                                        color: 'var(--text-secondary)',
+                                                        transition: 'all 0.2s ease'
+                                                    }}
+                                                    onMouseEnter={(e) => { e.target.style.color = 'var(--primary-color)'; e.target.style.background = 'rgba(37, 99, 235, 0.04)'; }}
+                                                    onMouseLeave={(e) => { e.target.style.color = 'var(--text-secondary)'; e.target.style.background = 'transparent'; }}
+                                                >
+                                                    <Eye size={16} />
+                                                </button>
+                                                <button
+                                                    className="hms-action-btn edit"
+                                                    title="Edit Patient"
+                                                    onClick={() => openEditModal(patient)}
+                                                    style={{
+                                                        padding: '6px',
+                                                        borderRadius: '6px',
+                                                        border: 'none',
+                                                        background: 'transparent',
+                                                        cursor: 'pointer',
+                                                        color: 'var(--text-secondary)',
+                                                        transition: 'all 0.2s ease'
+                                                    }}
+                                                    onMouseEnter={(e) => { e.target.style.color = '#22C55E'; e.target.style.background = 'rgba(34, 197, 94, 0.04)'; }}
+                                                    onMouseLeave={(e) => { e.target.style.color = 'var(--text-secondary)'; e.target.style.background = 'transparent'; }}
+                                                >
+                                                    <Edit2 size={16} />
+                                                </button>
+                                                <button
+                                                    className="hms-action-btn delete"
+                                                    title="Delete Patient"
+                                                    onClick={() => openDeleteModal(patient)}
+                                                    style={{
+                                                        padding: '6px',
+                                                        borderRadius: '6px',
+                                                        border: 'none',
+                                                        background: 'transparent',
+                                                        cursor: 'pointer',
+                                                        color: 'var(--text-secondary)',
+                                                        transition: 'all 0.2s ease'
+                                                    }}
+                                                    onMouseEnter={(e) => { e.target.style.color = '#EF4444'; e.target.style.background = 'rgba(239, 68, 68, 0.04)'; }}
+                                                    onMouseLeave={(e) => { e.target.style.color = 'var(--text-secondary)'; e.target.style.background = 'transparent'; }}
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 )}
             </div>
 
             {/* ===== PAGINATION ===== */}
             {totalPages > 1 && (
-                <div className="hms-pagination" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', padding: '12px 18px' }}>
+                <div className="hms-pagination" style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '12px',
+                    padding: '12px 18px',
+                    marginTop: '16px',
+                    background: 'var(--card-bg)',
+                    borderRadius: '12px',
+                    border: '1px solid var(--border-color)'
+                }}>
                     <div className="hms-pagination-info" style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                         Showing <strong>{startRange}</strong> to <strong>{endRange}</strong> of <strong>{total}</strong> patients
                     </div>
@@ -2778,18 +3369,60 @@ const Patients = () => {
             )}
 
             {/* ===== DELETE CONFIRMATION MODAL ===== */}
-            {isDeleteOpen && (
+            {isDeleteOpen && selectedPatient && (
                 <div className="hms-modal-backdrop" onClick={() => setIsDeleteOpen(false)}>
-                    <div className="hms-modal small" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
-                        <div className="hms-modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid var(--border-color)' }}>
-                            <h3 className="hms-modal-title" style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0, color: 'var(--danger-color)' }}>
+                    <div className="hms-modal" onClick={(e) => e.stopPropagation()} style={{
+                        maxWidth: '420px',
+                        maxHeight: '90vh',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        background: 'var(--card-bg)',
+                        borderRadius: '16px',
+                        boxShadow: 'var(--shadow-xl)',
+                        border: '1px solid var(--border-color)',
+                        width: '100%',
+                        margin: '16px'
+                    }}>
+                        <div className="hms-modal-header" style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '16px 20px',
+                            borderBottom: '1px solid var(--border-color)',
+                            background: 'var(--bg-primary)',
+                            borderRadius: '16px 16px 0 0'
+                        }}>
+                            <h3 className="hms-modal-title" style={{
+                                fontSize: '1.1rem',
+                                fontWeight: 600,
+                                margin: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                color: 'var(--danger-color)'
+                            }}>
+                                <Trash2 size={18} />
                                 Delete Patient Record
                             </h3>
-                            <button className="hms-modal-close" onClick={() => setIsDeleteOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px', borderRadius: '6px' }}>
+                            <button
+                                onClick={() => setIsDeleteOpen(false)}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    color: 'var(--text-secondary)',
+                                    padding: '4px',
+                                    borderRadius: '6px',
+                                    transition: 'all 0.2s ease'
+                                }}
+                            >
                                 <X size={20} />
                             </button>
                         </div>
-                        <div className="hms-modal-body" style={{ padding: '24px', textAlign: 'center' }}>
+                        <div className="hms-modal-body" style={{
+                            padding: '24px',
+                            textAlign: 'center'
+                        }}>
                             <div style={{ fontSize: '3rem', marginBottom: '12px' }}>⚠️</div>
                             <p style={{ fontWeight: 600, fontSize: '1rem', marginBottom: '8px', color: 'var(--text-primary)' }}>
                                 Are you absolutely sure?
@@ -2801,7 +3434,15 @@ const Patients = () => {
                                 This action cannot be undone.
                             </p>
                         </div>
-                        <div className="hms-modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', padding: '14px 20px', borderTop: '1px solid var(--border-color)', background: 'var(--bg-primary)' }}>
+                        <div className="hms-modal-footer" style={{
+                            display: 'flex',
+                            justifyContent: 'flex-end',
+                            gap: '10px',
+                            padding: '14px 20px',
+                            borderTop: '1px solid var(--border-color)',
+                            background: 'var(--bg-primary)',
+                            borderRadius: '0 0 16px 16px'
+                        }}>
                             <button
                                 onClick={() => setIsDeleteOpen(false)}
                                 style={{
@@ -2815,8 +3456,6 @@ const Patients = () => {
                                     color: 'var(--text-secondary)',
                                     transition: 'all 0.2s ease'
                                 }}
-                                onMouseEnter={(e) => { e.target.style.background = 'var(--hover-bg)'; }}
-                                onMouseLeave={(e) => { e.target.style.background = 'transparent'; }}
                             >
                                 Cancel
                             </button>
@@ -2839,16 +3478,6 @@ const Patients = () => {
                                     opacity: actionLoading ? 0.7 : 1,
                                     transition: 'all 0.2s ease'
                                 }}
-                                onMouseEnter={(e) => {
-                                    if (!actionLoading) {
-                                        e.target.style.background = 'var(--danger-hover)';
-                                    }
-                                }}
-                                onMouseLeave={(e) => {
-                                    if (!actionLoading) {
-                                        e.target.style.background = 'var(--danger-color)';
-                                    }
-                                }}
                             >
                                 <Trash2 size={16} />
                                 {actionLoading ? 'Deleting...' : 'Delete Patient'}
@@ -2858,7 +3487,7 @@ const Patients = () => {
                 </div>
             )}
 
-            {/* ===== VIEW DETAILS / PROFILE CARD MODAL ===== */}
+            {/* ===== VIEW DETAILS MODAL ===== */}
             {isDetailOpen && selectedPatient && (
                 <div className="hms-modal-backdrop" onClick={() => setIsDetailOpen(false)}>
                     <div className="hms-modal" onClick={(e) => e.stopPropagation()} style={{
@@ -2874,7 +3503,6 @@ const Patients = () => {
                         margin: '16px',
                         overflow: 'hidden'
                     }}>
-                        {/* Modal Header */}
                         <div className="hms-modal-header" style={{
                             display: 'flex',
                             justifyContent: 'space-between',
@@ -2882,6 +3510,7 @@ const Patients = () => {
                             padding: '16px 20px',
                             borderBottom: '1px solid var(--border-color)',
                             background: 'var(--bg-primary)',
+                            borderRadius: '16px 16px 0 0',
                             flexShrink: 0
                         }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -2897,8 +3526,6 @@ const Patients = () => {
                                         display: 'flex',
                                         alignItems: 'center'
                                     }}
-                                    onMouseEnter={(e) => { e.target.style.background = 'var(--hover-bg)'; }}
-                                    onMouseLeave={(e) => { e.target.style.background = 'transparent'; }}
                                 >
                                     <X size={20} />
                                 </button>
@@ -2930,8 +3557,6 @@ const Patients = () => {
                                         alignItems: 'center',
                                         gap: '4px'
                                     }}
-                                    onMouseEnter={(e) => { e.target.style.background = 'var(--hover-bg)'; }}
-                                    onMouseLeave={(e) => { e.target.style.background = 'transparent'; }}
                                 >
                                     <Printer size={14} /> Print
                                 </button>
@@ -2952,15 +3577,12 @@ const Patients = () => {
                                         alignItems: 'center',
                                         gap: '4px'
                                     }}
-                                    onMouseEnter={(e) => { e.target.style.background = 'var(--primary-hover)'; }}
-                                    onMouseLeave={(e) => { e.target.style.background = 'var(--primary-color)'; }}
                                 >
                                     <Edit2 size={14} /> Edit
                                 </button>
                             </div>
                         </div>
 
-                        {/* Modal Body */}
                         <div className="hms-modal-body" style={{
                             padding: '20px',
                             overflowY: 'auto',
@@ -2970,7 +3592,6 @@ const Patients = () => {
                             {renderDetailContent()}
                         </div>
 
-                        {/* Modal Footer */}
                         <div className="hms-modal-footer" style={{
                             display: 'flex',
                             justifyContent: 'flex-end',
@@ -2978,6 +3599,7 @@ const Patients = () => {
                             padding: '14px 20px',
                             borderTop: '1px solid var(--border-color)',
                             background: 'var(--bg-primary)',
+                            borderRadius: '0 0 16px 16px',
                             flexShrink: 0
                         }}>
                             <button
@@ -2993,8 +3615,6 @@ const Patients = () => {
                                     color: 'var(--text-secondary)',
                                     transition: 'all 0.2s ease'
                                 }}
-                                onMouseEnter={(e) => { e.target.style.background = 'var(--hover-bg)'; }}
-                                onMouseLeave={(e) => { e.target.style.background = 'transparent'; }}
                             >
                                 Close
                             </button>
@@ -3018,8 +3638,6 @@ const Patients = () => {
                                     gap: '6px',
                                     transition: 'all 0.2s ease'
                                 }}
-                                onMouseEnter={(e) => { e.target.style.background = 'var(--primary-hover)'; }}
-                                onMouseLeave={(e) => { e.target.style.background = 'var(--primary-color)'; }}
                             >
                                 <Edit2 size={16} /> Edit Profile
                             </button>
@@ -3028,10 +3646,16 @@ const Patients = () => {
                 </div>
             )}
 
+            {/* ===== APPOINTMENT DETAIL MODAL ===== */}
+            {renderAppointmentDetailModal()}
+
+            {/* ===== PRESCRIPTION DETAIL MODAL ===== */}
+            {renderPrescriptionDetailModal()}
+
             {/* ===== EDIT MODAL ===== */}
             {renderEditModal()}
 
-            <style jsx>{`
+            <style>{`
                 .spinner {
                     animation: spin 1s linear infinite;
                 }
@@ -3039,6 +3663,27 @@ const Patients = () => {
                     from { transform: rotate(0deg); }
                     to { transform: rotate(360deg); }
                 }
+
+                .hms-modal-backdrop {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0,0,0,0.5);
+                    backdrop-filter: blur(4px);
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 999;
+                    animation: fadeIn 0.2s ease;
+                }
+
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+
                 @media print {
                     .hms-modal-backdrop {
                         background: white !important;
@@ -3052,23 +3697,27 @@ const Patients = () => {
                         display: none !important;
                     }
                 }
+
                 @media (max-width: 768px) {
-                    .patient-detail-grid {
-                        grid-template-columns: 1fr !important;
-                    }
-                    .profile-card-details {
-                        border-right: none !important;
-                        border-bottom: 1px solid var(--border-color) !important;
-                        padding-bottom: 20px !important;
-                    }
-                }
-                @media (max-width: 480px) {
                     .hms-modal {
                         max-width: 95% !important;
                         margin: 8px !important;
+                        max-height: 95vh !important;
+                        border-radius: 12px !important;
                     }
                     .hms-modal-body {
                         padding: 12px !important;
+                    }
+                    .hms-modal-header {
+                        padding: 12px 14px !important;
+                    }
+                    .hms-modal-footer {
+                        padding: 10px 14px !important;
+                        flex-wrap: wrap !important;
+                    }
+                    .hms-modal-footer button {
+                        width: 100% !important;
+                        justify-content: center !important;
                     }
                 }
             `}</style>

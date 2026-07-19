@@ -12,7 +12,8 @@ import {
     ArrowLeft, Loader, Clipboard, Truck, Box,
     TrendingUp, TrendingDown, Users, Warehouse,
     Receipt, CreditCard, Banknote, Building, Bell,
-    History, Wallet, List, BarChart3, File, FileBox
+    History, Wallet, List, BarChart3, File, FileBox,
+    ChevronUp
 } from 'lucide-react';
 
 const Inventory = () => {
@@ -839,10 +840,9 @@ const Inventory = () => {
     };
 
     // ============================================================
-    // ===== EXPORT FUNCTIONS - COMPLETE =====
+    // ===== EXPORT FUNCTIONS =====
     // ============================================================
 
-    // ===== 1. EXPORT TO CSV =====
     const exportToCSV = () => {
         setExporting(true);
         try {
@@ -869,7 +869,6 @@ const Inventory = () => {
 
             const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
 
-            // Create download
             const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
             const url = URL.createObjectURL(blob);
@@ -891,7 +890,6 @@ const Inventory = () => {
         }
     };
 
-    // ===== 2. EXPORT TO EXCEL =====
     const exportToExcel = () => {
         setExporting(true);
         try {
@@ -907,20 +905,6 @@ const Inventory = () => {
                       xmlns="http://www.w3.org/TR/REC-html40">
                 <head>
                     <meta charset="UTF-8">
-                    <!--[if gte mso 9]>
-                    <xml>
-                        <x:ExcelWorkbook>
-                            <x:ExcelWorksheets>
-                                <x:ExcelWorksheet>
-                                    <x:Name>Inventory</x:Name>
-                                    <x:WorksheetOptions>
-                                        <x:DisplayGridlines/>
-                                    </x:WorksheetOptions>
-                                </x:ExcelWorksheet>
-                            </x:ExcelWorksheets>
-                        </x:ExcelWorkbook>
-                    </xml>
-                    <![endif]-->
                     <style>
                         table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 12px; }
                         th { background-color: #4A90D9; color: white; padding: 8px; border: 1px solid #ddd; }
@@ -937,8 +921,6 @@ const Inventory = () => {
                     <p>Generated: ${new Date().toLocaleString()}</p>
                     <p>Total Items: ${filteredItems.length}</p>
                     <p>Total Value: Rs. ${stats.totalValue.toFixed(2)}</p>
-                    <p>Total Restocks: ${stats.totalRestocks}</p>
-                    <p>Total Payments: Rs. ${stats.totalPaidAmount.toFixed(2)}</p>
                     <br/>
                     <table>
                         <thead>
@@ -969,7 +951,6 @@ const Inventory = () => {
                 `;
             });
 
-            // Totals row
             const totalQty = filteredItems.reduce((acc, item) => acc + (parseInt(item.quantity) || 0), 0);
             const totalValue = filteredItems.reduce((acc, item) => acc + (parseFloat(item.price) || 0) * (parseInt(item.quantity) || 0), 0);
 
@@ -1010,11 +991,9 @@ const Inventory = () => {
         }
     };
 
-    // ===== 3. EXPORT TO PDF (using print) =====
     const exportToPDF = () => {
         setExporting(true);
         try {
-            // Create a printable version
             const printWindow = window.open('', '_blank', 'width=800,height=600');
             if (!printWindow) {
                 alert('Please allow popups to print the report.');
@@ -1036,19 +1015,15 @@ const Inventory = () => {
                         body { font-family: Arial, sans-serif; padding: 40px; }
                         h2 { color: #2563EB; }
                         .header { text-align: center; margin-bottom: 30px; }
-                        .header h1 { font-size: 24px; margin: 0; }
-                        .header p { color: #666; font-size: 14px; margin: 5px 0; }
                         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
                         th { background-color: #2563EB; color: white; padding: 10px; text-align: left; font-size: 12px; }
                         td { padding: 8px 10px; border-bottom: 1px solid #ddd; font-size: 12px; }
-                        tr:nth-child(even) { background-color: #f9f9f9; }
                         .low-stock { color: #F59E0B; font-weight: bold; }
                         .out-of-stock { color: #EF4444; font-weight: bold; }
                         .good-stock { color: #22C55E; font-weight: bold; }
                         .footer { margin-top: 30px; text-align: center; color: #999; font-size: 11px; border-top: 1px solid #ddd; padding-top: 20px; }
                         .stats { margin: 20px 0; padding: 15px; background: #f0f4ff; border-radius: 8px; }
                         .stats span { display: inline-block; margin-right: 30px; font-size: 13px; }
-                        .stats strong { color: #2563EB; }
                     </style>
                 </head>
                 <body>
@@ -1104,7 +1079,6 @@ const Inventory = () => {
                     
                     <div class="footer">
                         <p>Generated by Subhan Care Clinic HMS | ${new Date().toLocaleString()}</p>
-                        <p style="font-size: 10px;">This is a system-generated report.</p>
                     </div>
                     
                     <script>
@@ -1133,7 +1107,6 @@ const Inventory = () => {
         }
     };
 
-    // ===== 4. EXPORT TO JSON =====
     const exportToJSON = () => {
         setExporting(true);
         try {
@@ -1181,7 +1154,6 @@ const Inventory = () => {
         }
     };
 
-    // ===== 5. PRINT REPORT =====
     const printReport = () => {
         setExporting(true);
         try {
@@ -1198,13 +1170,17 @@ const Inventory = () => {
 
     // ===== FILTERED ITEMS =====
     const filteredItems = items.filter(item => {
-        const matchesSearch = item.item_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        const matchesSearch = searchQuery === '' ||
+            item.item_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             (item.category || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (item.location || '').toLowerCase().includes(searchQuery.toLowerCase());
+            (item.location || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (item.suppliers?.name || '').toLowerCase().includes(searchQuery.toLowerCase());
+
         const matchesCategory = categoryFilter === '' || item.category === categoryFilter;
         const matchesStatus = statusFilter === '' || getStockStatus(item).type === statusFilter;
         const matchesDate = dateFilter === '' ||
             new Date(item.created_at).toDateString() === new Date(dateFilter).toDateString();
+
         return matchesSearch && matchesCategory && matchesStatus && matchesDate;
     });
 
@@ -1220,6 +1196,8 @@ const Inventory = () => {
             return (parseInt(b.quantity) || 0) - (parseInt(a.quantity) || 0);
         } else if (sortBy === 'price') {
             return (parseFloat(b.price) || 0) - (parseFloat(a.price) || 0);
+        } else if (sortBy === 'supplier') {
+            return (a.suppliers?.name || '').localeCompare(b.suppliers?.name || '');
         }
         return 0;
     });
@@ -1255,6 +1233,1044 @@ const Inventory = () => {
         return stockMovements.filter(m => m.inventory_id === itemId && m.movement_type === 'restock').length;
     };
 
+    // ============================================================
+    // ===== CATEGORY MODAL - INLINE STYLES =====
+    // ============================================================
+    const CategoryModal = () => (
+        <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.6)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            backdropFilter: 'blur(4px)'
+        }} onClick={() => setIsCategoryOpen(false)}>
+            <div style={{
+                background: 'var(--card-bg)',
+                borderRadius: '16px',
+                maxWidth: '450px',
+                width: '100%',
+                maxHeight: '90vh',
+                display: 'flex',
+                flexDirection: 'column',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                border: '1px solid var(--border-color)',
+                margin: '16px',
+                overflow: 'hidden'
+            }} onClick={(e) => e.stopPropagation()}>
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '16px 20px',
+                    borderBottom: '1px solid var(--border-color)',
+                    background: 'var(--bg-primary)',
+                    flexShrink: 0
+                }}>
+                    <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Layers size={18} style={{ color: '#8B5CF6' }} /> Add Category
+                    </h3>
+                    <button onClick={() => setIsCategoryOpen(false)} style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: 'var(--text-secondary)', padding: '4px', borderRadius: '6px'
+                    }}>
+                        <X size={18} />
+                    </button>
+                </div>
+                <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
+                    {errorMsg && <div style={{ padding: '10px 14px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '0.85rem', background: '#EF444415', border: '1px solid #EF444430', color: '#EF4444' }}><AlertCircle size={16} /> {errorMsg}</div>}
+                    {successMsg && <div style={{ padding: '10px 14px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '0.85rem', background: '#22C55E15', border: '1px solid #22C55E30', color: '#16A34A' }}><Check size={16} /> {successMsg}</div>}
+                    <form onSubmit={handleCategorySubmit}>
+                        <div style={{ marginBottom: '12px' }}>
+                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>Category Name *</label>
+                            <input type="text" name="name" value={categoryForm.name} onChange={handleCategoryChange} placeholder="e.g. Surgical Supplies" required style={{ width: '100%', height: '40px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.8rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+                        </div>
+                        <div style={{ marginBottom: '12px' }}>
+                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>Description</label>
+                            <input type="text" name="description" value={categoryForm.description} onChange={handleCategoryChange} placeholder="Category description" style={{ width: '100%', height: '40px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.8rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+                        </div>
+                        <div style={{ marginBottom: '12px' }}>
+                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>Color</label>
+                            <input type="color" name="color" value={categoryForm.color} onChange={handleCategoryChange} style={{ width: '100%', height: '40px', padding: '4px', cursor: 'pointer', border: '1.5px solid var(--border-color)', borderRadius: '8px', boxSizing: 'border-box' }} />
+                        </div>
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'flex-end',
+                            gap: '8px',
+                            paddingTop: '14px',
+                            borderTop: '1px solid var(--border-color)',
+                            marginTop: '8px',
+                            flexWrap: 'wrap'
+                        }}>
+                            <button type="button" onClick={() => setIsCategoryOpen(false)} style={{ padding: '6px 16px', border: '1.5px solid var(--border-color)', borderRadius: '8px', background: 'transparent', cursor: 'pointer', fontSize: '0.8rem', fontFamily: 'var(--font-family)', color: 'var(--text-secondary)' }}>Cancel</button>
+                            <button type="submit" disabled={actionLoading} style={{ padding: '6px 16px', border: 'none', borderRadius: '8px', background: actionLoading ? 'var(--primary-color)70' : 'var(--primary-color)', cursor: actionLoading ? 'not-allowed' : 'pointer', fontSize: '0.8rem', fontFamily: 'var(--font-family)', color: 'white', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Layers size={14} /> {actionLoading ? 'Adding...' : 'Add Category'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    );
+
+    // ============================================================
+    // ===== SUPPLIER MODAL - INLINE STYLES =====
+    // ============================================================
+    const SupplierModal = () => (
+        <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.6)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            backdropFilter: 'blur(4px)'
+        }} onClick={() => setIsSupplierOpen(false)}>
+            <div style={{
+                background: 'var(--card-bg)',
+                borderRadius: '16px',
+                maxWidth: '550px',
+                width: '100%',
+                maxHeight: '90vh',
+                display: 'flex',
+                flexDirection: 'column',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                border: '1px solid var(--border-color)',
+                margin: '16px',
+                overflow: 'hidden'
+            }} onClick={(e) => e.stopPropagation()}>
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '16px 20px',
+                    borderBottom: '1px solid var(--border-color)',
+                    background: 'var(--bg-primary)',
+                    flexShrink: 0
+                }}>
+                    <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Truck size={18} style={{ color: '#8B5CF6' }} /> Add Supplier
+                    </h3>
+                    <button onClick={() => setIsSupplierOpen(false)} style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: 'var(--text-secondary)', padding: '4px', borderRadius: '6px'
+                    }}>
+                        <X size={18} />
+                    </button>
+                </div>
+                <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
+                    {errorMsg && <div style={{ padding: '10px 14px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '0.85rem', background: '#EF444415', border: '1px solid #EF444430', color: '#EF4444' }}><AlertCircle size={16} /> {errorMsg}</div>}
+                    {successMsg && <div style={{ padding: '10px 14px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '0.85rem', background: '#22C55E15', border: '1px solid #22C55E30', color: '#16A34A' }}><Check size={16} /> {successMsg}</div>}
+                    <form onSubmit={handleSupplierSubmit}>
+                        <div style={{ marginBottom: '12px' }}>
+                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>Supplier Name *</label>
+                            <input type="text" name="name" value={supplierForm.name} onChange={handleSupplierChange} placeholder="e.g. MediCare Supplies" required style={{ width: '100%', height: '40px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.8rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+                        </div>
+                        <div style={{ marginBottom: '12px' }}>
+                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>Contact Person</label>
+                            <input type="text" name="contact_person" value={supplierForm.contact_person} onChange={handleSupplierChange} placeholder="e.g. Mr. Ahmed" style={{ width: '100%', height: '40px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.8rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
+                            <div style={{ marginBottom: '12px' }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>Phone</label>
+                                <input type="text" name="phone" value={supplierForm.phone} onChange={handleSupplierChange} placeholder="e.g. 051-1234567" style={{ width: '100%', height: '40px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.8rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+                            </div>
+                            <div style={{ marginBottom: '12px' }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>Email</label>
+                                <input type="email" name="email" value={supplierForm.email} onChange={handleSupplierChange} placeholder="info@supplier.com" style={{ width: '100%', height: '40px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.8rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+                            </div>
+                        </div>
+                        <div style={{ marginBottom: '12px' }}>
+                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>Address</label>
+                            <input type="text" name="address" value={supplierForm.address} onChange={handleSupplierChange} placeholder="Complete address" style={{ width: '100%', height: '40px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.8rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
+                            <div style={{ marginBottom: '12px' }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>City</label>
+                                <input type="text" name="city" value={supplierForm.city} onChange={handleSupplierChange} placeholder="e.g. Islamabad" style={{ width: '100%', height: '40px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.8rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+                            </div>
+                            <div style={{ marginBottom: '12px' }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>Payment Terms</label>
+                                <input type="text" name="payment_terms" value={supplierForm.payment_terms} onChange={handleSupplierChange} placeholder="e.g. Net 30 days" style={{ width: '100%', height: '40px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.8rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+                            </div>
+                        </div>
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'flex-end',
+                            gap: '8px',
+                            paddingTop: '14px',
+                            borderTop: '1px solid var(--border-color)',
+                            marginTop: '8px',
+                            flexWrap: 'wrap'
+                        }}>
+                            <button type="button" onClick={() => setIsSupplierOpen(false)} style={{ padding: '6px 16px', border: '1.5px solid var(--border-color)', borderRadius: '8px', background: 'transparent', cursor: 'pointer', fontSize: '0.8rem', fontFamily: 'var(--font-family)', color: 'var(--text-secondary)' }}>Cancel</button>
+                            <button type="submit" disabled={actionLoading} style={{ padding: '6px 16px', border: 'none', borderRadius: '8px', background: actionLoading ? 'var(--primary-color)70' : 'var(--primary-color)', cursor: actionLoading ? 'not-allowed' : 'pointer', fontSize: '0.8rem', fontFamily: 'var(--font-family)', color: 'white', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Truck size={14} /> {actionLoading ? 'Adding...' : 'Add Supplier'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    );
+
+    // ============================================================
+    // ===== ADD ITEM MODAL - INLINE STYLES =====
+    // ============================================================
+    const AddItemModal = () => (
+        <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.6)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            backdropFilter: 'blur(4px)'
+        }} onClick={() => setIsAddOpen(false)}>
+            <div style={{
+                background: 'var(--card-bg)',
+                borderRadius: '16px',
+                maxWidth: '700px',
+                width: '100%',
+                maxHeight: '90vh',
+                display: 'flex',
+                flexDirection: 'column',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                border: '1px solid var(--border-color)',
+                margin: '16px',
+                overflow: 'hidden'
+            }} onClick={(e) => e.stopPropagation()}>
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '16px 20px',
+                    borderBottom: '1px solid var(--border-color)',
+                    background: 'var(--bg-primary)',
+                    flexShrink: 0
+                }}>
+                    <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Package size={18} style={{ color: 'var(--primary-color)' }} /> Add Inventory Item
+                    </h3>
+                    <button onClick={() => setIsAddOpen(false)} style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: 'var(--text-secondary)', padding: '4px', borderRadius: '6px'
+                    }}>
+                        <X size={18} />
+                    </button>
+                </div>
+                <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
+                    {errorMsg && <div style={{ padding: '10px 14px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '0.85rem', background: '#EF444415', border: '1px solid #EF444430', color: '#EF4444' }}><AlertCircle size={16} /> {errorMsg}</div>}
+                    {successMsg && <div style={{ padding: '10px 14px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '0.85rem', background: '#22C55E15', border: '1px solid #22C55E30', color: '#16A34A' }}><Check size={16} /> {successMsg}</div>}
+                    <form onSubmit={handleAddSubmit}>
+                        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
+                            <div style={{ marginBottom: '12px' }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>Item Name *</label>
+                                <input type="text" name="item_name" value={formData.item_name} onChange={handleFormChange} required placeholder="Enter item name" style={{ width: '100%', height: '40px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.8rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+                                {formErrors.item_name && <span style={{ fontSize: '0.7rem', color: 'var(--danger-color)', display: 'block', marginTop: '4px' }}>{formErrors.item_name}</span>}
+                            </div>
+                            <div style={{ marginBottom: '12px' }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>Category *</label>
+                                <select name="category" value={formData.category} onChange={handleFormChange} required style={{ width: '100%', height: '40px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.8rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}>
+                                    <option value="">Select Category</option>
+                                    {categories.map(cat => (
+                                        <option key={cat.id} value={cat.name}>{cat.name}</option>
+                                    ))}
+                                </select>
+                                {formErrors.category && <span style={{ fontSize: '0.7rem', color: 'var(--danger-color)', display: 'block', marginTop: '4px' }}>{formErrors.category}</span>}
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
+                            <div style={{ marginBottom: '12px' }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>Quantity *</label>
+                                <input type="number" name="quantity" value={formData.quantity} onChange={handleFormChange} min="0" required placeholder="0" style={{ width: '100%', height: '40px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.8rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+                                {formErrors.quantity && <span style={{ fontSize: '0.7rem', color: 'var(--danger-color)', display: 'block', marginTop: '4px' }}>{formErrors.quantity}</span>}
+                            </div>
+                            <div style={{ marginBottom: '12px' }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>Minimum Quantity</label>
+                                <input type="number" name="minimum_quantity" value={formData.minimum_quantity} onChange={handleFormChange} min="0" placeholder="10" style={{ width: '100%', height: '40px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.8rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
+                            <div style={{ marginBottom: '12px' }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>Selling Price (Rs.) *</label>
+                                <input type="number" name="price" value={formData.price} onChange={handleFormChange} step="0.01" min="0" required placeholder="0.00" style={{ width: '100%', height: '40px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.8rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+                                {formErrors.price && <span style={{ fontSize: '0.7rem', color: 'var(--danger-color)', display: 'block', marginTop: '4px' }}>{formErrors.price}</span>}
+                            </div>
+                            <div style={{ marginBottom: '12px' }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>Cost Price (Rs.)</label>
+                                <input type="number" name="cost_price" value={formData.cost_price} onChange={handleFormChange} step="0.01" min="0" placeholder="0.00" style={{ width: '100%', height: '40px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.8rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
+                            <div style={{ marginBottom: '12px' }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>Unit</label>
+                                <select name="unit" value={formData.unit} onChange={handleFormChange} style={{ width: '100%', height: '40px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.8rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}>
+                                    <option value="pcs">Pieces (pcs)</option>
+                                    <option value="box">Box</option>
+                                    <option value="pack">Pack</option>
+                                    <option value="bottle">Bottle</option>
+                                    <option value="strip">Strip</option>
+                                    <option value="vial">Vial</option>
+                                    <option value="ampoule">Ampoule</option>
+                                    <option value="tablet">Tablet</option>
+                                    <option value="capsule">Capsule</option>
+                                    <option value="ml">ML</option>
+                                    <option value="mg">MG</option>
+                                    <option value="g">Gram</option>
+                                    <option value="kg">KG</option>
+                                    <option value="roll">Roll</option>
+                                    <option value="sheet">Sheet</option>
+                                    <option value="set">Set</option>
+                                    <option value="pair">Pair</option>
+                                </select>
+                            </div>
+                            <div style={{ marginBottom: '12px' }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>Supplier</label>
+                                <select name="supplier_id" value={formData.supplier_id} onChange={handleFormChange} style={{ width: '100%', height: '40px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.8rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}>
+                                    <option value="">Select Supplier</option>
+                                    {suppliers.map(s => (
+                                        <option key={s.id} value={s.id}>{s.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
+                            <div style={{ marginBottom: '12px' }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>Location</label>
+                                <input type="text" name="location" value={formData.location} onChange={handleFormChange} placeholder="e.g. Store Room A, Shelf 3" style={{ width: '100%', height: '40px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.8rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+                            </div>
+                            <div style={{ marginBottom: '12px' }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>Batch Number</label>
+                                <input type="text" name="batch_number" value={formData.batch_number} onChange={handleFormChange} placeholder="e.g. BATCH-2024-001" style={{ width: '100%', height: '40px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.8rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
+                            <div style={{ marginBottom: '12px' }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>Expiry Date</label>
+                                <input type="date" name="expiry_date" value={formData.expiry_date} onChange={handleFormChange} style={{ width: '100%', height: '40px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.8rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+                            </div>
+                            <div style={{ marginBottom: '12px' }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>Reorder Point</label>
+                                <input type="number" name="reorder_point" value={formData.reorder_point} onChange={handleFormChange} min="0" placeholder="5" style={{ width: '100%', height: '40px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.8rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+                            </div>
+                        </div>
+
+                        <div style={{ marginBottom: '12px' }}>
+                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>Description / Notes</label>
+                            <textarea name="notes" value={formData.notes} onChange={handleFormChange} placeholder="Additional notes..." rows={isMobile ? 2 : 3} style={{ width: '100%', padding: '8px 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.8rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box', resize: 'vertical', minHeight: '60px' }} />
+                        </div>
+
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'flex-end',
+                            gap: '8px',
+                            paddingTop: '14px',
+                            borderTop: '1px solid var(--border-color)',
+                            marginTop: '8px',
+                            flexWrap: 'wrap'
+                        }}>
+                            <button type="button" onClick={() => setIsAddOpen(false)} style={{ padding: '6px 16px', border: '1.5px solid var(--border-color)', borderRadius: '8px', background: 'transparent', cursor: 'pointer', fontSize: '0.8rem', fontFamily: 'var(--font-family)', color: 'var(--text-secondary)' }}>Cancel</button>
+                            <button type="submit" disabled={actionLoading} style={{ padding: '6px 16px', border: 'none', borderRadius: '8px', background: actionLoading ? 'var(--primary-color)70' : 'var(--primary-color)', cursor: actionLoading ? 'not-allowed' : 'pointer', fontSize: '0.8rem', fontFamily: 'var(--font-family)', color: 'white', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Package size={14} /> {actionLoading ? 'Adding...' : 'Add Item'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    );
+
+    // ============================================================
+    // ===== EDIT ITEM MODAL - INLINE STYLES =====
+    // ============================================================
+    const EditItemModal = () => (
+        <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.6)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            backdropFilter: 'blur(4px)'
+        }} onClick={() => setIsEditOpen(false)}>
+            <div style={{
+                background: 'var(--card-bg)',
+                borderRadius: '16px',
+                maxWidth: '700px',
+                width: '100%',
+                maxHeight: '90vh',
+                display: 'flex',
+                flexDirection: 'column',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                border: '1px solid var(--border-color)',
+                margin: '16px',
+                overflow: 'hidden'
+            }} onClick={(e) => e.stopPropagation()}>
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '16px 20px',
+                    borderBottom: '1px solid var(--border-color)',
+                    background: 'var(--bg-primary)',
+                    flexShrink: 0
+                }}>
+                    <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Edit size={18} style={{ color: '#22C55E' }} /> Edit Item
+                    </h3>
+                    <button onClick={() => setIsEditOpen(false)} style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: 'var(--text-secondary)', padding: '4px', borderRadius: '6px'
+                    }}>
+                        <X size={18} />
+                    </button>
+                </div>
+                <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
+                    {errorMsg && <div style={{ padding: '10px 14px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '0.85rem', background: '#EF444415', border: '1px solid #EF444430', color: '#EF4444' }}><AlertCircle size={16} /> {errorMsg}</div>}
+                    {successMsg && <div style={{ padding: '10px 14px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '0.85rem', background: '#22C55E15', border: '1px solid #22C55E30', color: '#16A34A' }}><Check size={16} /> {successMsg}</div>}
+                    <form onSubmit={handleEditSubmit}>
+                        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
+                            <div style={{ marginBottom: '12px' }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>Item Name *</label>
+                                <input type="text" name="item_name" value={formData.item_name} onChange={handleFormChange} required placeholder="Enter item name" style={{ width: '100%', height: '40px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.8rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+                                {formErrors.item_name && <span style={{ fontSize: '0.7rem', color: 'var(--danger-color)', display: 'block', marginTop: '4px' }}>{formErrors.item_name}</span>}
+                            </div>
+                            <div style={{ marginBottom: '12px' }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>Category *</label>
+                                <select name="category" value={formData.category} onChange={handleFormChange} required style={{ width: '100%', height: '40px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.8rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}>
+                                    <option value="">Select Category</option>
+                                    {categories.map(cat => (
+                                        <option key={cat.id} value={cat.name}>{cat.name}</option>
+                                    ))}
+                                </select>
+                                {formErrors.category && <span style={{ fontSize: '0.7rem', color: 'var(--danger-color)', display: 'block', marginTop: '4px' }}>{formErrors.category}</span>}
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
+                            <div style={{ marginBottom: '12px' }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>Quantity *</label>
+                                <input type="number" name="quantity" value={formData.quantity} onChange={handleFormChange} min="0" required placeholder="0" style={{ width: '100%', height: '40px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.8rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+                                {formErrors.quantity && <span style={{ fontSize: '0.7rem', color: 'var(--danger-color)', display: 'block', marginTop: '4px' }}>{formErrors.quantity}</span>}
+                            </div>
+                            <div style={{ marginBottom: '12px' }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>Minimum Quantity</label>
+                                <input type="number" name="minimum_quantity" value={formData.minimum_quantity} onChange={handleFormChange} min="0" placeholder="10" style={{ width: '100%', height: '40px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.8rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
+                            <div style={{ marginBottom: '12px' }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>Selling Price (Rs.) *</label>
+                                <input type="number" name="price" value={formData.price} onChange={handleFormChange} step="0.01" min="0" required placeholder="0.00" style={{ width: '100%', height: '40px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.8rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+                                {formErrors.price && <span style={{ fontSize: '0.7rem', color: 'var(--danger-color)', display: 'block', marginTop: '4px' }}>{formErrors.price}</span>}
+                            </div>
+                            <div style={{ marginBottom: '12px' }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>Cost Price (Rs.)</label>
+                                <input type="number" name="cost_price" value={formData.cost_price} onChange={handleFormChange} step="0.01" min="0" placeholder="0.00" style={{ width: '100%', height: '40px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.8rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+                            </div>
+                        </div>
+
+                        <div style={{ marginBottom: '12px' }}>
+                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>Notes</label>
+                            <textarea name="notes" value={formData.notes} onChange={handleFormChange} rows={isMobile ? 2 : 3} placeholder="Additional notes..." style={{ width: '100%', padding: '8px 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: '0.8rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box', resize: 'vertical', minHeight: '60px' }} />
+                        </div>
+
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'flex-end',
+                            gap: '8px',
+                            paddingTop: '14px',
+                            borderTop: '1px solid var(--border-color)',
+                            marginTop: '8px',
+                            flexWrap: 'wrap'
+                        }}>
+                            <button type="button" onClick={() => setIsEditOpen(false)} style={{ padding: '6px 16px', border: '1.5px solid var(--border-color)', borderRadius: '8px', background: 'transparent', cursor: 'pointer', fontSize: '0.8rem', fontFamily: 'var(--font-family)', color: 'var(--text-secondary)' }}>Cancel</button>
+                            <button type="submit" disabled={actionLoading} style={{ padding: '6px 16px', border: 'none', borderRadius: '8px', background: actionLoading ? 'var(--primary-color)70' : 'var(--primary-color)', cursor: actionLoading ? 'not-allowed' : 'pointer', fontSize: '0.8rem', fontFamily: 'var(--font-family)', color: 'white', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Save size={14} /> {actionLoading ? 'Saving...' : 'Update Item'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    );
+
+    // ============================================================
+    // ===== RESTOCK MODAL - INLINE STYLES =====
+    // ============================================================
+    const RestockModal = () => (
+        <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.6)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            backdropFilter: 'blur(4px)'
+        }} onClick={() => setIsRestockOpen(false)}>
+            <div style={{
+                background: 'var(--card-bg)',
+                borderRadius: '16px',
+                maxWidth: '450px',
+                width: '100%',
+                maxHeight: '90vh',
+                display: 'flex',
+                flexDirection: 'column',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                border: '1px solid var(--border-color)',
+                margin: '16px',
+                overflow: 'hidden'
+            }} onClick={(e) => e.stopPropagation()}>
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '16px 20px',
+                    borderBottom: '1px solid var(--border-color)',
+                    background: 'var(--bg-primary)',
+                    flexShrink: 0
+                }}>
+                    <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <PackageOpen size={18} style={{ color: '#8B5CF6' }} /> Restock Item
+                    </h3>
+                    <button onClick={() => setIsRestockOpen(false)} style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: 'var(--text-secondary)', padding: '4px', borderRadius: '6px'
+                    }}>
+                        <X size={18} />
+                    </button>
+                </div>
+                <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
+                    {errorMsg && <div style={{ padding: '10px 14px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '0.85rem', background: '#EF444415', border: '1px solid #EF444430', color: '#EF4444' }}><AlertCircle size={16} /> {errorMsg}</div>}
+                    <div style={{ padding: '12px', background: 'var(--bg-primary)', borderRadius: '10px', border: '1px solid var(--border-color)', marginBottom: '16px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Item</span>
+                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{selectedItem?.item_name}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Current Quantity</span>
+                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{selectedItem?.quantity || 0} {selectedItem?.unit || 'pcs'}</span>
+                        </div>
+                    </div>
+                    <form onSubmit={handleRestockSubmit}>
+                        <div style={{ marginBottom: '12px' }}>
+                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>Add Quantity *</label>
+                            <input type="number" value={restockQty} onChange={(e) => setRestockQty(e.target.value)} placeholder="Enter quantity to add" min="1" required style={{ width: '100%', height: '40px', padding: '0 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', fontFamily: 'var(--font-family)', fontSize: isMobile ? '1rem' : '1.1rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+                        </div>
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'flex-end',
+                            gap: '8px',
+                            paddingTop: '14px',
+                            borderTop: '1px solid var(--border-color)',
+                            marginTop: '8px',
+                            flexWrap: 'wrap'
+                        }}>
+                            <button type="button" onClick={() => setIsRestockOpen(false)} style={{ padding: '6px 16px', border: '1.5px solid var(--border-color)', borderRadius: '8px', background: 'transparent', cursor: 'pointer', fontSize: '0.8rem', fontFamily: 'var(--font-family)', color: 'var(--text-secondary)' }}>Cancel</button>
+                            <button type="submit" disabled={actionLoading} style={{ padding: '6px 16px', border: 'none', borderRadius: '8px', background: actionLoading ? 'var(--primary-color)70' : 'var(--primary-color)', cursor: actionLoading ? 'not-allowed' : 'pointer', fontSize: '0.8rem', fontFamily: 'var(--font-family)', color: 'white', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <PackageOpen size={14} /> {actionLoading ? 'Restocking...' : 'Confirm Restock'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    );
+
+    // ============================================================
+    // ===== DELETE MODAL - INLINE STYLES =====
+    // ============================================================
+    const DeleteModal = () => (
+        <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.6)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            backdropFilter: 'blur(4px)'
+        }} onClick={() => setIsDeleteOpen(false)}>
+            <div style={{
+                background: 'var(--card-bg)',
+                borderRadius: '16px',
+                maxWidth: '400px',
+                width: '100%',
+                maxHeight: '90vh',
+                display: 'flex',
+                flexDirection: 'column',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                border: '1px solid var(--border-color)',
+                margin: '16px',
+                overflow: 'hidden'
+            }} onClick={(e) => e.stopPropagation()}>
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '16px 20px',
+                    borderBottom: '1px solid var(--border-color)',
+                    background: 'var(--bg-primary)',
+                    flexShrink: 0
+                }}>
+                    <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Trash2 size={18} style={{ color: 'var(--danger-color)' }} /> Delete Item
+                    </h3>
+                    <button onClick={() => setIsDeleteOpen(false)} style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: 'var(--text-secondary)', padding: '4px', borderRadius: '6px'
+                    }}>
+                        <X size={18} />
+                    </button>
+                </div>
+                <div style={{ padding: '20px', textAlign: 'center', overflowY: 'auto', flex: 1 }}>
+                    <div style={{ fontSize: '3rem', marginBottom: '12px' }}>⚠️</div>
+                    <p style={{ fontWeight: 600, fontSize: '1rem', marginBottom: '8px' }}>Are you sure you want to delete this item?</p>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Item: <strong>{selectedItem?.item_name}</strong><br />Category: <strong>{selectedItem?.category || 'N/A'}</strong><br />Quantity: <strong>{selectedItem?.quantity || 0} units</strong></p>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '8px' }}>This action cannot be undone.</p>
+                </div>
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    padding: '14px 20px',
+                    borderTop: '1px solid var(--border-color)',
+                    background: 'var(--bg-primary)',
+                    flexWrap: 'wrap'
+                }}>
+                    <button type="button" onClick={() => setIsDeleteOpen(false)} style={{ padding: '6px 16px', border: '1.5px solid var(--border-color)', borderRadius: '8px', background: 'transparent', cursor: 'pointer', fontSize: '0.8rem', fontFamily: 'var(--font-family)', color: 'var(--text-secondary)' }}>Cancel</button>
+                    <button onClick={handleDeleteSubmit} disabled={actionLoading} style={{ padding: '6px 16px', border: 'none', borderRadius: '8px', background: actionLoading ? 'var(--danger-color)70' : 'var(--danger-color)', cursor: actionLoading ? 'not-allowed' : 'pointer', fontSize: '0.8rem', fontFamily: 'var(--font-family)', color: 'white', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Trash2 size={14} /> {actionLoading ? 'Deleting...' : 'Delete Permanently'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+
+    // ============================================================
+    // ===== VIEW ITEM MODAL - INLINE STYLES =====
+    // ============================================================
+    const ViewItemModal = () => (
+        <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.6)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            backdropFilter: 'blur(4px)'
+        }} onClick={() => setIsViewOpen(false)}>
+            <div style={{
+                background: 'var(--card-bg)',
+                borderRadius: '16px',
+                maxWidth: '550px',
+                width: '100%',
+                maxHeight: '90vh',
+                display: 'flex',
+                flexDirection: 'column',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                border: '1px solid var(--border-color)',
+                margin: '16px',
+                overflow: 'hidden'
+            }} onClick={(e) => e.stopPropagation()}>
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '16px 20px',
+                    borderBottom: '1px solid var(--border-color)',
+                    background: 'var(--bg-primary)',
+                    flexShrink: 0
+                }}>
+                    <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Package size={18} style={{ color: 'var(--primary-color)' }} /> Item Details
+                    </h3>
+                    <button onClick={() => setIsViewOpen(false)} style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: 'var(--text-secondary)', padding: '4px', borderRadius: '6px'
+                    }}>
+                        <X size={18} />
+                    </button>
+                </div>
+                <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '8px', marginBottom: '16px' }}>
+                        <div style={{ padding: '10px', background: 'var(--bg-primary)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                            <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>Item Name</div>
+                            <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>{selectedItem?.item_name}</div>
+                        </div>
+                        <div style={{ padding: '10px', background: 'var(--bg-primary)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                            <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>Category</div>
+                            <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>{selectedItem?.category || 'N/A'}</div>
+                        </div>
+                        <div style={{ padding: '10px', background: 'var(--bg-primary)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                            <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>Quantity</div>
+                            <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>{selectedItem?.quantity || 0} {selectedItem?.unit || 'pcs'}</div>
+                        </div>
+                        <div style={{ padding: '10px', background: 'var(--bg-primary)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                            <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>Price</div>
+                            <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>Rs. {parseFloat(selectedItem?.price || 0).toFixed(2)}</div>
+                        </div>
+                    </div>
+                    {selectedItem?.notes && (
+                        <div style={{ padding: '10px', background: 'var(--bg-primary)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                            <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>Notes</div>
+                            <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', marginTop: '4px' }}>{selectedItem.notes}</div>
+                        </div>
+                    )}
+                    <div style={{
+                        display: 'flex',
+                        justifyContent: 'flex-end',
+                        gap: '8px',
+                        paddingTop: '14px',
+                        borderTop: '1px solid var(--border-color)',
+                        marginTop: '8px',
+                        flexWrap: 'wrap'
+                    }}>
+                        <button onClick={() => { setIsViewOpen(false); openHistoryModal(selectedItem); }} style={{ padding: '6px 16px', border: 'none', borderRadius: '8px', background: 'var(--primary-color)', cursor: 'pointer', fontSize: '0.8rem', fontFamily: 'var(--font-family)', color: 'white', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}><History size={14} /> History</button>
+                        <button onClick={() => { setIsViewOpen(false); openEditModal(selectedItem); }} style={{ padding: '6px 16px', border: '1.5px solid var(--border-color)', borderRadius: '8px', background: 'transparent', cursor: 'pointer', fontSize: '0.8rem', fontFamily: 'var(--font-family)', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}><Edit size={14} /> Edit</button>
+                        <button onClick={() => { setIsViewOpen(false); openRestockModal(selectedItem); }} style={{ padding: '6px 16px', border: 'none', borderRadius: '8px', background: '#10B981', cursor: 'pointer', fontSize: '0.8rem', fontFamily: 'var(--font-family)', color: 'white', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}><PackageOpen size={14} /> Restock</button>
+                        <button onClick={() => setIsViewOpen(false)} style={{ padding: '6px 16px', border: '1.5px solid var(--border-color)', borderRadius: '8px', background: 'transparent', cursor: 'pointer', fontSize: '0.8rem', fontFamily: 'var(--font-family)', color: 'var(--text-secondary)' }}>Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+
+    // ============================================================
+    // ===== RESTOCK HISTORY MODAL - INLINE STYLES =====
+    // ============================================================
+    const HistoryModal = () => (
+        <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.6)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            backdropFilter: 'blur(4px)'
+        }} onClick={() => setIsHistoryOpen(false)}>
+            <div style={{
+                background: 'var(--card-bg)',
+                borderRadius: '16px',
+                maxWidth: '700px',
+                width: '100%',
+                maxHeight: '90vh',
+                display: 'flex',
+                flexDirection: 'column',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                border: '1px solid var(--border-color)',
+                margin: '16px',
+                overflow: 'hidden'
+            }} onClick={(e) => e.stopPropagation()}>
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '16px 20px',
+                    borderBottom: '1px solid var(--border-color)',
+                    background: 'var(--bg-primary)',
+                    flexShrink: 0
+                }}>
+                    <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <History size={18} style={{ color: '#8B5CF6' }} /> Restock History - {selectedItem?.item_name}
+                    </h3>
+                    <button onClick={() => setIsHistoryOpen(false)} style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: 'var(--text-secondary)', padding: '4px', borderRadius: '6px'
+                    }}>
+                        <X size={18} />
+                    </button>
+                </div>
+                <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
+                    {selectedHistory.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '40px' }}><div style={{ fontSize: '3rem', marginBottom: '12px' }}>📦</div><h3>No Restock History</h3><p>This item has not been restocked yet.</p></div>
+                    ) : (
+                        <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', minWidth: isMobile ? '400px' : '600px' }}>
+                                <thead>
+                                    <tr>
+                                        <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>Date</th>
+                                        <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>Quantity</th>
+                                        <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>Previous Qty</th>
+                                        <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>New Qty</th>
+                                        <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>Reason</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {selectedHistory.map((movement, index) => (
+                                        <tr key={index} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                            <td style={{ padding: '8px 14px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{new Date(movement.created_at).toLocaleString()}</td>
+                                            <td style={{ padding: '8px 14px', textAlign: 'center', fontWeight: 600, color: '#8B5CF6' }}>+{movement.quantity}</td>
+                                            <td style={{ padding: '8px 14px', textAlign: 'center' }}>{movement.previous_quantity}</td>
+                                            <td style={{ padding: '8px 14px', textAlign: 'center', fontWeight: 600, color: '#10B981' }}>{movement.new_quantity}</td>
+                                            <td style={{ padding: '8px 14px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{movement.reason || 'Restock'}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    padding: '14px 20px',
+                    borderTop: '1px solid var(--border-color)',
+                    background: 'var(--bg-primary)'
+                }}>
+                    <button onClick={() => setIsHistoryOpen(false)} style={{ padding: '6px 16px', border: '1.5px solid var(--border-color)', borderRadius: '8px', background: 'transparent', cursor: 'pointer', fontSize: '0.8rem', fontFamily: 'var(--font-family)', color: 'var(--text-secondary)' }}>Close</button>
+                </div>
+            </div>
+        </div>
+    );
+
+    // ============================================================
+    // ===== PAYMENT HISTORY MODAL - INLINE STYLES =====
+    // ============================================================
+    const PaymentHistoryModal = () => (
+        <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.6)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            backdropFilter: 'blur(4px)'
+        }} onClick={() => setIsPaymentHistoryOpen(false)}>
+            <div style={{
+                background: 'var(--card-bg)',
+                borderRadius: '16px',
+                maxWidth: '700px',
+                width: '100%',
+                maxHeight: '90vh',
+                display: 'flex',
+                flexDirection: 'column',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                border: '1px solid var(--border-color)',
+                margin: '16px',
+                overflow: 'hidden'
+            }} onClick={(e) => e.stopPropagation()}>
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '16px 20px',
+                    borderBottom: '1px solid var(--border-color)',
+                    background: 'var(--bg-primary)',
+                    flexShrink: 0
+                }}>
+                    <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Wallet size={18} style={{ color: '#10B981' }} /> Payment History
+                    </h3>
+                    <button onClick={() => setIsPaymentHistoryOpen(false)} style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: 'var(--text-secondary)', padding: '4px', borderRadius: '6px'
+                    }}>
+                        <X size={18} />
+                    </button>
+                </div>
+                <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
+                    {payments.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '40px' }}><div style={{ fontSize: '3rem', marginBottom: '12px' }}>💰</div><h3>No Payments Recorded</h3><p>No supplier payments have been recorded yet.</p></div>
+                    ) : (
+                        <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', minWidth: isMobile ? '400px' : '600px' }}>
+                                <thead>
+                                    <tr>
+                                        <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>Supplier</th>
+                                        <th style={{ padding: '10px 14px', textAlign: 'right', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>Amount</th>
+                                        <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>Method</th>
+                                        <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>Date</th>
+                                        <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>Status</th>
+                                        <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>Reference</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {payments.map((payment, index) => (
+                                        <tr key={index} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                            <td style={{ padding: '8px 14px', fontWeight: 600 }}>{payment.suppliers?.name || 'N/A'}</td>
+                                            <td style={{ padding: '8px 14px', textAlign: 'right', fontWeight: 600, color: '#10B981' }}>Rs. {parseFloat(payment.amount).toFixed(2)}</td>
+                                            <td style={{ padding: '8px 14px', textAlign: 'center' }}>{payment.payment_method || 'N/A'}</td>
+                                            <td style={{ padding: '8px 14px', textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{new Date(payment.payment_date).toLocaleDateString()}</td>
+                                            <td style={{ padding: '8px 14px', textAlign: 'center' }}><span style={{ padding: '2px 10px', borderRadius: '20px', fontSize: '0.65rem', fontWeight: 600, background: payment.status === 'paid' ? '#10B98115' : '#F59E0B15', color: payment.status === 'paid' ? '#10B981' : '#F59E0B', border: `1px solid ${payment.status === 'paid' ? '#10B981' : '#F59E0B'}30` }}>{payment.status === 'paid' ? '✅ Paid' : '⏳ Pending'}</span></td>
+                                            <td style={{ padding: '8px 14px', textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{payment.reference || 'N/A'}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                    <div style={{ marginTop: '16px', padding: '12px', background: 'var(--bg-primary)', borderRadius: '10px', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Total Paid:</span>
+                        <span style={{ fontWeight: 700, color: '#10B981', fontSize: isMobile ? '0.9rem' : '1.1rem' }}>Rs. {stats.totalPaidAmount.toFixed(2)}</span>
+                    </div>
+                </div>
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    padding: '14px 20px',
+                    borderTop: '1px solid var(--border-color)',
+                    background: 'var(--bg-primary)'
+                }}>
+                    <button onClick={() => setIsPaymentHistoryOpen(false)} style={{ padding: '6px 16px', border: '1.5px solid var(--border-color)', borderRadius: '8px', background: 'transparent', cursor: 'pointer', fontSize: '0.8rem', fontFamily: 'var(--font-family)', color: 'var(--text-secondary)' }}>Close</button>
+                </div>
+            </div>
+        </div>
+    );
+
+    // ============================================================
+    // ===== LOW STOCK ALERT MODAL - INLINE STYLES =====
+    // ============================================================
+    const LowStockModal = () => (
+        <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.6)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            backdropFilter: 'blur(4px)'
+        }} onClick={() => setIsLowStockOpen(false)}>
+            <div style={{
+                background: 'var(--card-bg)',
+                borderRadius: '16px',
+                maxWidth: '700px',
+                width: '100%',
+                maxHeight: '90vh',
+                display: 'flex',
+                flexDirection: 'column',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                border: '1px solid var(--border-color)',
+                margin: '16px',
+                overflow: 'hidden'
+            }} onClick={(e) => e.stopPropagation()}>
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '16px 20px',
+                    borderBottom: '1px solid var(--border-color)',
+                    background: 'var(--bg-primary)',
+                    flexShrink: 0
+                }}>
+                    <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <AlertCircle size={18} style={{ color: '#F59E0B' }} /> Low Stock Alert
+                    </h3>
+                    <button onClick={() => setIsLowStockOpen(false)} style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: 'var(--text-secondary)', padding: '4px', borderRadius: '6px'
+                    }}>
+                        <X size={18} />
+                    </button>
+                </div>
+                <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
+                    {lowStockItems.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '40px' }}><div style={{ fontSize: '3rem', marginBottom: '12px' }}>✅</div><h3>All items are well stocked!</h3><p>No low stock items found.</p></div>
+                    ) : (
+                        <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', minWidth: isMobile ? '400px' : '600px' }}>
+                                <thead>
+                                    <tr>
+                                        <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>Item</th>
+                                        <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>Category</th>
+                                        <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>Current Qty</th>
+                                        <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>Min Qty</th>
+                                        <th style={{ padding: '10px 14px', textAlign: 'center', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>Status</th>
+                                        <th style={{ padding: '10px 14px', textAlign: 'right', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {lowStockItems.map(item => {
+                                        const status = getStockStatus(item);
+                                        return (
+                                            <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                                <td style={{ padding: '8px 14px', fontWeight: 600 }}>{item.item_name}</td>
+                                                <td style={{ padding: '8px 14px' }}>{item.category || 'N/A'}</td>
+                                                <td style={{ padding: '8px 14px', textAlign: 'center' }}>{item.quantity}</td>
+                                                <td style={{ padding: '8px 14px', textAlign: 'center' }}>{item.minimum_quantity}</td>
+                                                <td style={{ padding: '8px 14px', textAlign: 'center' }}><span style={{ padding: '2px 10px', borderRadius: '20px', fontSize: '0.65rem', fontWeight: 600, background: status.bg, color: status.color, border: `1px solid ${status.color}30` }}>{status.icon} {status.label}</span></td>
+                                                <td style={{ padding: '8px 14px', textAlign: 'right' }}>
+                                                    <button onClick={() => { setIsLowStockOpen(false); openRestockModal(item); }} style={{ padding: '4px 12px', fontSize: '0.7rem', border: 'none', borderRadius: '6px', background: 'var(--primary-color)', cursor: 'pointer', color: 'white', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><PackageOpen size={14} /> Restock</button>
+                                                    <button onClick={() => { setIsLowStockOpen(false); openHistoryModal(item); }} style={{ padding: '4px 12px', fontSize: '0.7rem', border: '1.5px solid var(--border-color)', borderRadius: '6px', background: 'transparent', cursor: 'pointer', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: '4px' }}><History size={14} /> History</button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    padding: '14px 20px',
+                    borderTop: '1px solid var(--border-color)',
+                    background: 'var(--bg-primary)'
+                }}>
+                    <button onClick={() => setIsLowStockOpen(false)} style={{ padding: '6px 16px', border: '1.5px solid var(--border-color)', borderRadius: '8px', background: 'transparent', cursor: 'pointer', fontSize: '0.8rem', fontFamily: 'var(--font-family)', color: 'var(--text-secondary)' }}>Close</button>
+                </div>
+            </div>
+        </div>
+    );
+
     return (
         <DashboardLayout active="inventory" title="Inventory Management">
             {/* ===== NOTIFICATION TOAST ===== */}
@@ -1276,26 +2292,9 @@ const Inventory = () => {
                     maxWidth: isMobile ? '95%' : '450px',
                     animation: 'slideInRight 0.5s ease'
                 }}>
-                    {notificationType === 'success' ? (
-                        <Check size={20} style={{ flexShrink: 0 }} />
-                    ) : (
-                        <AlertCircle size={20} style={{ flexShrink: 0 }} />
-                    )}
+                    {notificationType === 'success' ? <Check size={20} style={{ flexShrink: 0 }} /> : <AlertCircle size={20} style={{ flexShrink: 0 }} />}
                     <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>{notificationMessage}</span>
-                    <button
-                        onClick={() => setShowNotification(false)}
-                        style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'white',
-                            cursor: 'pointer',
-                            padding: '4px',
-                            marginLeft: 'auto',
-                            opacity: 0.8
-                        }}
-                    >
-                        <X size={18} />
-                    </button>
+                    <button onClick={() => setShowNotification(false)} style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', padding: '4px', marginLeft: 'auto', opacity: 0.8 }}><X size={18} /></button>
                 </div>
             )}
 
@@ -1370,22 +2369,19 @@ const Inventory = () => {
                         <RefreshCw size={14} /> Refresh
                     </button>
 
-                    {/* ===== EXPORT BUTTON WITH FULL MENU ===== */}
+                    {/* EXPORT BUTTON */}
                     <div style={{ position: 'relative', flex: isMobile ? 1 : 'none' }}>
-                        <button
-                            onClick={() => setShowExportMenu(!showExportMenu)}
-                            disabled={exporting}
-                            style={{
-                                display: 'flex', alignItems: 'center', gap: '6px',
-                                padding: '6px 12px', border: '1px solid var(--border-color)',
-                                borderRadius: '8px', background: 'var(--bg-primary)',
-                                cursor: exporting ? 'not-allowed' : 'pointer',
-                                fontSize: '0.75rem', fontFamily: 'var(--font-family)',
-                                color: 'var(--text-secondary)',
-                                opacity: exporting ? 0.6 : 1,
-                                transition: 'all 0.2s ease',
-                                width: '100%', justifyContent: 'center'
-                            }}
+                        <button onClick={() => setShowExportMenu(!showExportMenu)} disabled={exporting} style={{
+                            display: 'flex', alignItems: 'center', gap: '6px',
+                            padding: '6px 12px', border: '1px solid var(--border-color)',
+                            borderRadius: '8px', background: 'var(--bg-primary)',
+                            cursor: exporting ? 'not-allowed' : 'pointer',
+                            fontSize: '0.75rem', fontFamily: 'var(--font-family)',
+                            color: 'var(--text-secondary)',
+                            opacity: exporting ? 0.6 : 1,
+                            transition: 'all 0.2s ease',
+                            width: '100%', justifyContent: 'center'
+                        }}
                             onMouseEnter={(e) => {
                                 if (!exporting) {
                                     e.target.style.background = 'var(--hover-bg)';
@@ -1401,169 +2397,94 @@ const Inventory = () => {
                                 }
                             }}
                         >
-                            {exporting ? (
-                                <Loader size={14} className="spinner" />
-                            ) : (
-                                <Download size={14} />
-                            )}
-                            {isMobile ? 'Export' : 'Export'}
-                            <ChevronDown size={12} />
+                            {exporting ? <Loader size={14} className="spinner" /> : <Download size={14} />}
+                            {isMobile ? 'Export' : 'Export'} <ChevronDown size={12} />
                         </button>
 
                         {showExportMenu && !exporting && (
                             <div style={{
-                                position: 'absolute',
-                                top: '100%',
-                                right: 0,
-                                marginTop: '4px',
-                                background: 'var(--card-bg)',
+                                position: 'absolute', top: '100%', right: 0,
+                                marginTop: '4px', background: 'var(--card-bg)',
                                 border: '1px solid var(--border-color)',
-                                borderRadius: '10px',
-                                boxShadow: 'var(--shadow-lg)',
-                                minWidth: isMobile ? '180px' : '200px',
-                                zIndex: 100,
-                                padding: '6px 0',
+                                borderRadius: '10px', boxShadow: 'var(--shadow-lg)',
+                                minWidth: isMobile ? '160px' : '200px',
+                                zIndex: 100, padding: '6px 0',
                                 animation: 'slideDown 0.2s ease'
                             }}>
-                                {/* CSV Option */}
-                                <button
-                                    onClick={exportToCSV}
-                                    style={{
-                                        display: 'flex', alignItems: 'center', gap: '10px',
-                                        padding: '8px 14px', width: '100%', border: 'none',
-                                        background: 'transparent', cursor: 'pointer',
-                                        fontSize: '0.8rem', fontFamily: 'var(--font-family)',
-                                        color: 'var(--text-primary)',
-                                        transition: 'all 0.15s ease'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.target.style.background = 'var(--hover-bg)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.target.style.background = 'transparent';
-                                    }}
-                                >
-                                    <FileText size={16} style={{ color: '#3B82F6' }} />
-                                    <span>Export as CSV</span>
+                                <button onClick={exportToCSV} style={{
+                                    display: 'flex', alignItems: 'center', gap: '10px',
+                                    padding: '8px 14px', width: '100%', border: 'none',
+                                    background: 'transparent', cursor: 'pointer',
+                                    fontSize: '0.75rem', fontFamily: 'var(--font-family)',
+                                    color: 'var(--text-primary)',
+                                    transition: 'all 0.15s ease'
+                                }}
+                                    onMouseEnter={(e) => e.target.style.background = 'var(--hover-bg)'}
+                                    onMouseLeave={(e) => e.target.style.background = 'transparent'}>
+                                    <FileText size={16} style={{ color: '#3B82F6' }} /><span>CSV</span>
                                 </button>
-
-                                {/* Excel Option */}
-                                <button
-                                    onClick={exportToExcel}
-                                    style={{
-                                        display: 'flex', alignItems: 'center', gap: '10px',
-                                        padding: '8px 14px', width: '100%', border: 'none',
-                                        background: 'transparent', cursor: 'pointer',
-                                        fontSize: '0.8rem', fontFamily: 'var(--font-family)',
-                                        color: 'var(--text-primary)',
-                                        transition: 'all 0.15s ease'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.target.style.background = 'var(--hover-bg)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.target.style.background = 'transparent';
-                                    }}
-                                >
-                                    <FileSpreadsheet size={16} style={{ color: '#22C55E' }} />
-                                    <span>Export as Excel (.xls)</span>
+                                <button onClick={exportToExcel} style={{
+                                    display: 'flex', alignItems: 'center', gap: '10px',
+                                    padding: '8px 14px', width: '100%', border: 'none',
+                                    background: 'transparent', cursor: 'pointer',
+                                    fontSize: '0.75rem', fontFamily: 'var(--font-family)',
+                                    color: 'var(--text-primary)',
+                                    transition: 'all 0.15s ease'
+                                }}
+                                    onMouseEnter={(e) => e.target.style.background = 'var(--hover-bg)'}
+                                    onMouseLeave={(e) => e.target.style.background = 'transparent'}>
+                                    <FileSpreadsheet size={16} style={{ color: '#22C55E' }} /><span>Excel</span>
                                 </button>
-
-                                {/* PDF Option */}
-                                <button
-                                    onClick={exportToPDF}
-                                    style={{
-                                        display: 'flex', alignItems: 'center', gap: '10px',
-                                        padding: '8px 14px', width: '100%', border: 'none',
-                                        background: 'transparent', cursor: 'pointer',
-                                        fontSize: '0.8rem', fontFamily: 'var(--font-family)',
-                                        color: 'var(--text-primary)',
-                                        transition: 'all 0.15s ease'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.target.style.background = 'var(--hover-bg)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.target.style.background = 'transparent';
-                                    }}
-                                >
-                                    <FileBox size={16} style={{ color: '#EF4444' }} />
-                                    <span>Export as PDF</span>
+                                <button onClick={exportToPDF} style={{
+                                    display: 'flex', alignItems: 'center', gap: '10px',
+                                    padding: '8px 14px', width: '100%', border: 'none',
+                                    background: 'transparent', cursor: 'pointer',
+                                    fontSize: '0.75rem', fontFamily: 'var(--font-family)',
+                                    color: 'var(--text-primary)',
+                                    transition: 'all 0.15s ease'
+                                }}
+                                    onMouseEnter={(e) => e.target.style.background = 'var(--hover-bg)'}
+                                    onMouseLeave={(e) => e.target.style.background = 'transparent'}>
+                                    <FileBox size={16} style={{ color: '#EF4444' }} /><span>PDF</span>
                                 </button>
-
-                                {/* JSON Option */}
-                                <button
-                                    onClick={exportToJSON}
-                                    style={{
-                                        display: 'flex', alignItems: 'center', gap: '10px',
-                                        padding: '8px 14px', width: '100%', border: 'none',
-                                        background: 'transparent', cursor: 'pointer',
-                                        fontSize: '0.8rem', fontFamily: 'var(--font-family)',
-                                        color: 'var(--text-primary)',
-                                        transition: 'all 0.15s ease'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.target.style.background = 'var(--hover-bg)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.target.style.background = 'transparent';
-                                    }}
-                                >
-                                    <FileJson size={16} style={{ color: '#8B5CF6' }} />
-                                    <span>Export as JSON</span>
+                                <button onClick={exportToJSON} style={{
+                                    display: 'flex', alignItems: 'center', gap: '10px',
+                                    padding: '8px 14px', width: '100%', border: 'none',
+                                    background: 'transparent', cursor: 'pointer',
+                                    fontSize: '0.75rem', fontFamily: 'var(--font-family)',
+                                    color: 'var(--text-primary)',
+                                    transition: 'all 0.15s ease'
+                                }}
+                                    onMouseEnter={(e) => e.target.style.background = 'var(--hover-bg)'}
+                                    onMouseLeave={(e) => e.target.style.background = 'transparent'}>
+                                    <FileJson size={16} style={{ color: '#8B5CF6' }} /><span>JSON</span>
                                 </button>
-
-                                <div style={{
+                                <div style={{ borderTop: '1px solid var(--border-color)', margin: '4px 8px' }} />
+                                <button onClick={printReport} style={{
+                                    display: 'flex', alignItems: 'center', gap: '10px',
+                                    padding: '8px 14px', width: '100%', border: 'none',
+                                    background: 'transparent', cursor: 'pointer',
+                                    fontSize: '0.75rem', fontFamily: 'var(--font-family)',
+                                    color: 'var(--text-primary)',
+                                    transition: 'all 0.15s ease'
+                                }}
+                                    onMouseEnter={(e) => e.target.style.background = 'var(--hover-bg)'}
+                                    onMouseLeave={(e) => e.target.style.background = 'transparent'}>
+                                    <Printer size={16} style={{ color: '#F59E0B' }} /><span>Print</span>
+                                </button>
+                                <button onClick={() => setShowExportMenu(false)} style={{
+                                    display: 'flex', alignItems: 'center', gap: '10px',
+                                    padding: '8px 14px', width: '100%', border: 'none',
+                                    background: 'transparent', cursor: 'pointer',
+                                    fontSize: '0.75rem', fontFamily: 'var(--font-family)',
+                                    color: 'var(--text-secondary)',
                                     borderTop: '1px solid var(--border-color)',
-                                    margin: '4px 8px'
-                                }} />
-
-                                {/* Print Option */}
-                                <button
-                                    onClick={printReport}
-                                    style={{
-                                        display: 'flex', alignItems: 'center', gap: '10px',
-                                        padding: '8px 14px', width: '100%', border: 'none',
-                                        background: 'transparent', cursor: 'pointer',
-                                        fontSize: '0.8rem', fontFamily: 'var(--font-family)',
-                                        color: 'var(--text-primary)',
-                                        transition: 'all 0.15s ease'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.target.style.background = 'var(--hover-bg)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.target.style.background = 'transparent';
-                                    }}
-                                >
-                                    <Printer size={16} style={{ color: '#F59E0B' }} />
-                                    <span>Print Report</span>
-                                </button>
-
-                                {/* Close Option */}
-                                <button
-                                    onClick={() => setShowExportMenu(false)}
-                                    style={{
-                                        display: 'flex', alignItems: 'center', gap: '10px',
-                                        padding: '8px 14px', width: '100%', border: 'none',
-                                        background: 'transparent', cursor: 'pointer',
-                                        fontSize: '0.8rem', fontFamily: 'var(--font-family)',
-                                        color: 'var(--text-secondary)',
-                                        borderTop: '1px solid var(--border-color)',
-                                        marginTop: '4px', paddingTop: '8px',
-                                        transition: 'all 0.15s ease'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.target.style.background = 'var(--hover-bg)';
-                                        e.target.style.color = 'var(--text-primary)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.target.style.background = 'transparent';
-                                        e.target.style.color = 'var(--text-secondary)';
-                                    }}
-                                >
-                                    <X size={16} />
-                                    <span>Close</span>
+                                    marginTop: '4px', paddingTop: '8px',
+                                    transition: 'all 0.15s ease'
+                                }}
+                                    onMouseEnter={(e) => { e.target.style.background = 'var(--hover-bg)'; e.target.style.color = 'var(--text-primary)'; }}
+                                    onMouseLeave={(e) => { e.target.style.background = 'transparent'; e.target.style.color = 'var(--text-secondary)'; }}>
+                                    <X size={16} /><span>Close</span>
                                 </button>
                             </div>
                         )}
@@ -1575,7 +2496,7 @@ const Inventory = () => {
                         borderRadius: '8px', background: 'transparent', cursor: 'pointer',
                         fontSize: '0.75rem', fontFamily: 'var(--font-family)',
                         color: 'var(--text-secondary)', transition: 'all 0.2s ease',
-                        flex: isMobile ? 1 : 'none'
+                        flex: isMobile ? 1 : 'none', justifyContent: 'center'
                     }}
                         onMouseEnter={(e) => {
                             e.target.style.background = 'var(--hover-bg)';
@@ -1597,7 +2518,7 @@ const Inventory = () => {
                         borderRadius: '8px', background: 'transparent', cursor: 'pointer',
                         fontSize: '0.75rem', fontFamily: 'var(--font-family)',
                         color: 'var(--text-secondary)', transition: 'all 0.2s ease',
-                        flex: isMobile ? 1 : 'none'
+                        flex: isMobile ? 1 : 'none', justifyContent: 'center'
                     }}
                         onMouseEnter={(e) => {
                             e.target.style.background = 'var(--hover-bg)';
@@ -1643,7 +2564,6 @@ const Inventory = () => {
                 gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(150px, 1fr))',
                 gap: '12px', marginBottom: '20px'
             }}>
-                {/* Total Items */}
                 <div style={{
                     padding: '14px 16px', background: 'var(--card-bg)',
                     borderRadius: '12px', border: '1px solid var(--border-color)',
@@ -1666,7 +2586,6 @@ const Inventory = () => {
                     </div>
                 </div>
 
-                {/* Low Stock */}
                 <div style={{
                     padding: '14px 16px', background: 'var(--card-bg)',
                     borderRadius: '12px', border: '1px solid var(--border-color)',
@@ -1690,7 +2609,6 @@ const Inventory = () => {
                     </div>
                 </div>
 
-                {/* Payments */}
                 <div style={{
                     padding: '14px 16px', background: 'var(--card-bg)',
                     borderRadius: '12px', border: '1px solid var(--border-color)',
@@ -1717,7 +2635,6 @@ const Inventory = () => {
                     </div>
                 </div>
 
-                {/* Restocks */}
                 <div style={{
                     padding: '14px 16px', background: 'var(--card-bg)',
                     borderRadius: '12px', border: '1px solid var(--border-color)',
@@ -1740,7 +2657,6 @@ const Inventory = () => {
                     </div>
                 </div>
 
-                {/* Total Value */}
                 <div style={{
                     padding: '14px 16px', background: 'var(--card-bg)',
                     borderRadius: '12px', border: '1px solid var(--border-color)',
@@ -1764,9 +2680,284 @@ const Inventory = () => {
                 </div>
             </div>
 
-            {/* ============================================================ */}
+            {/* ===== FILTERS BAR ===== */}
+            <div style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '10px',
+                padding: '12px 16px',
+                background: 'var(--card-bg)',
+                borderRadius: '12px',
+                border: '1px solid var(--border-color)',
+                boxShadow: 'var(--shadow-sm)',
+                marginBottom: '16px'
+            }}>
+                <div style={{ flex: 1, minWidth: '160px', position: 'relative' }}>
+                    <Search size={16} style={{
+                        position: 'absolute',
+                        left: '10px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        color: 'var(--text-muted)'
+                    }} />
+                    <input
+                        type="text"
+                        placeholder="Search items, category, supplier..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        style={{
+                            width: '100%',
+                            height: '36px',
+                            padding: '6px 12px 6px 34px',
+                            border: '1.5px solid var(--border-color)',
+                            borderRadius: '10px',
+                            fontSize: '0.8rem',
+                            fontFamily: 'var(--font-family)',
+                            background: 'var(--bg-primary)',
+                            color: 'var(--text-primary)',
+                            outline: 'none',
+                            transition: 'all 0.2s ease'
+                        }}
+                        onFocus={(e) => {
+                            e.target.style.borderColor = 'var(--primary-color)';
+                            e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)';
+                        }}
+                        onBlur={(e) => {
+                            e.target.style.borderColor = 'var(--border-color)';
+                            e.target.style.boxShadow = 'none';
+                        }}
+                    />
+                </div>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <button
+                        onClick={() => setShowFilters(!showFilters)}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '5px 12px',
+                            height: '36px',
+                            border: '1.5px solid var(--border-color)',
+                            borderRadius: '10px',
+                            background: 'var(--bg-primary)',
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                            fontFamily: 'var(--font-family)',
+                            color: 'var(--text-secondary)',
+                            transition: 'all 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.target.style.borderColor = 'var(--primary-color)';
+                            e.target.style.background = 'rgba(37, 99, 235, 0.04)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.target.style.borderColor = 'var(--border-color)';
+                            e.target.style.background = 'var(--bg-primary)';
+                        }}
+                    >
+                        <Filter size={14} style={{ color: 'var(--primary-color)' }} /> Filters
+                        {activeFilterCount > 0 && (
+                            <span style={{
+                                background: 'var(--primary-color)',
+                                color: 'white',
+                                borderRadius: '50%',
+                                width: '18px',
+                                height: '18px',
+                                fontSize: '0.6rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 600
+                            }}>
+                                {activeFilterCount}
+                            </span>
+                        )}
+                    </button>
+
+                    <button
+                        onClick={openAddModal}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '5px 14px',
+                            height: '36px',
+                            border: 'none',
+                            borderRadius: '10px',
+                            background: 'var(--primary-color)',
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                            fontFamily: 'var(--font-family)',
+                            color: 'white',
+                            fontWeight: 500,
+                            transition: 'all 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.target.style.background = 'var(--primary-hover)';
+                            e.target.style.transform = 'translateY(-1px)';
+                            e.target.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.25)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.target.style.background = 'var(--primary-color)';
+                            e.target.style.transform = 'translateY(0)';
+                            e.target.style.boxShadow = 'none';
+                        }}
+                    >
+                        <Plus size={14} /> New Item
+                    </button>
+                </div>
+            </div>
+
+            {/* ===== FILTERS DROPDOWN ===== */}
+            {showFilters && (
+                <div style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '8px',
+                    padding: '12px 16px',
+                    background: 'var(--bg-primary)',
+                    borderRadius: '12px',
+                    border: '1px solid var(--border-color)',
+                    marginBottom: '16px',
+                    alignItems: 'center',
+                    animation: 'fadeIn 0.2s ease'
+                }}>
+                    <select
+                        value={categoryFilter}
+                        onChange={(e) => setCategoryFilter(e.target.value)}
+                        style={{
+                            height: '34px',
+                            padding: '0 12px',
+                            border: '1.5px solid var(--border-color)',
+                            borderRadius: '8px',
+                            fontSize: '0.75rem',
+                            fontFamily: 'var(--font-family)',
+                            background: 'var(--card-bg)',
+                            color: 'var(--text-primary)',
+                            outline: 'none',
+                            cursor: 'pointer',
+                            minWidth: '120px',
+                            flex: isMobile ? 1 : 'none'
+                        }}
+                        onFocus={(e) => e.target.style.borderColor = 'var(--primary-color)'}
+                        onBlur={(e) => e.target.style.borderColor = 'var(--border-color)'}
+                    >
+                        <option value="">All Categories</option>
+                        {categories.map(cat => (
+                            <option key={cat.id} value={cat.name}>{cat.name}</option>
+                        ))}
+                    </select>
+
+                    <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        style={{
+                            height: '34px',
+                            padding: '0 12px',
+                            border: '1.5px solid var(--border-color)',
+                            borderRadius: '8px',
+                            fontSize: '0.75rem',
+                            fontFamily: 'var(--font-family)',
+                            background: 'var(--card-bg)',
+                            color: 'var(--text-primary)',
+                            outline: 'none',
+                            cursor: 'pointer',
+                            minWidth: '110px',
+                            flex: isMobile ? 1 : 'none'
+                        }}
+                        onFocus={(e) => e.target.style.borderColor = 'var(--primary-color)'}
+                        onBlur={(e) => e.target.style.borderColor = 'var(--border-color)'}
+                    >
+                        <option value="">All Status</option>
+                        <option value="good">✅ In Stock</option>
+                        <option value="low">⚠️ Low Stock</option>
+                        <option value="out">❌ Out of Stock</option>
+                    </select>
+
+                    <input
+                        type="date"
+                        value={dateFilter}
+                        onChange={(e) => setDateFilter(e.target.value)}
+                        style={{
+                            height: '34px',
+                            padding: '0 12px',
+                            border: '1.5px solid var(--border-color)',
+                            borderRadius: '8px',
+                            fontSize: '0.75rem',
+                            fontFamily: 'var(--font-family)',
+                            background: 'var(--card-bg)',
+                            color: 'var(--text-primary)',
+                            outline: 'none',
+                            minWidth: '130px',
+                            flex: isMobile ? 1 : 'none'
+                        }}
+                        onFocus={(e) => e.target.style.borderColor = 'var(--primary-color)'}
+                        onBlur={(e) => e.target.style.borderColor = 'var(--border-color)'}
+                    />
+
+                    <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value)}
+                        style={{
+                            height: '34px',
+                            padding: '0 12px',
+                            border: '1.5px solid var(--border-color)',
+                            borderRadius: '8px',
+                            fontSize: '0.75rem',
+                            fontFamily: 'var(--font-family)',
+                            background: 'var(--card-bg)',
+                            color: 'var(--text-primary)',
+                            outline: 'none',
+                            cursor: 'pointer',
+                            minWidth: '100px',
+                            flex: isMobile ? 1 : 'none'
+                        }}
+                        onFocus={(e) => e.target.style.borderColor = 'var(--primary-color)'}
+                        onBlur={(e) => e.target.style.borderColor = 'var(--border-color)'}
+                    >
+                        <option value="newest">📅 Newest</option>
+                        <option value="oldest">📅 Oldest</option>
+                        <option value="name">🔤 By Name</option>
+                        <option value="quantity">📦 By Quantity</option>
+                        <option value="price">💰 By Price</option>
+                        <option value="supplier">👤 By Supplier</option>
+                    </select>
+
+                    <button
+                        onClick={clearFilters}
+                        style={{
+                            padding: '4px 12px',
+                            height: '34px',
+                            border: '1.5px solid var(--border-color)',
+                            borderRadius: '8px',
+                            background: 'transparent',
+                            cursor: 'pointer',
+                            fontSize: '0.7rem',
+                            fontFamily: 'var(--font-family)',
+                            color: 'var(--text-secondary)',
+                            transition: 'all 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.target.style.background = 'var(--hover-bg)';
+                            e.target.style.color = 'var(--text-primary)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.target.style.background = 'transparent';
+                            e.target.style.color = 'var(--text-secondary)';
+                        }}
+                    >
+                        Clear All
+                    </button>
+
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: 'auto' }}>
+                        {filteredItems.length} item{filteredItems.length !== 1 ? 's' : ''} found
+                    </span>
+                </div>
+            )}
+
             {/* ===== TABLE ===== */}
-            {/* ============================================================ */}
             <div className="hms-table-container">
                 {loading ? (
                     <div style={{ textAlign: 'center', padding: '40px' }}>
@@ -1777,15 +2968,19 @@ const Inventory = () => {
                     <div style={{ textAlign: 'center', padding: '40px' }}>
                         <div style={{ fontSize: '3rem', marginBottom: '12px' }}>📦</div>
                         <h3>No Items Found</h3>
-                        <p>Start by adding your first inventory item.</p>
+                        <p>
+                            {activeFilterCount > 0
+                                ? 'Try clearing your filters to see all items.'
+                                : 'Start by adding your first inventory item.'}
+                        </p>
                         <br />
                         <button onClick={openAddModal} className="btn-primary">
-                            <Plus size={16} /> First Item
+                            <Plus size={16} /> {activeFilterCount > 0 ? 'Clear Filters & Add Item' : 'First Item'}
                         </button>
                     </div>
                 ) : (
                     <div style={{ overflowX: 'auto' }}>
-                        <table className="hms-table">
+                        <table className="hms-table" style={{ minWidth: isMobile ? '500px' : '700px' }}>
                             <thead>
                                 <tr>
                                     <th>Item</th>
@@ -1860,19 +3055,11 @@ const Inventory = () => {
                                                 </button>
                                             </td>
                                             <td style={{ textAlign: 'right' }}>
-                                                <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
-                                                    <button onClick={() => openViewModal(item)} className="hms-action-btn" title="View">
-                                                        <Eye size={14} />
-                                                    </button>
-                                                    <button onClick={() => openRestockModal(item)} className="hms-action-btn success" title="Restock">
-                                                        <PackageOpen size={14} />
-                                                    </button>
-                                                    <button onClick={() => openEditModal(item)} className="hms-action-btn" title="Edit">
-                                                        <Edit size={14} />
-                                                    </button>
-                                                    <button onClick={() => openDeleteModal(item)} className="hms-action-btn danger" title="Delete">
-                                                        <Trash2 size={14} />
-                                                    </button>
+                                                <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                                                    <button onClick={() => openViewModal(item)} className="hms-action-btn" title="View"><Eye size={14} /></button>
+                                                    <button onClick={() => openRestockModal(item)} className="hms-action-btn success" title="Restock"><PackageOpen size={14} /></button>
+                                                    <button onClick={() => openEditModal(item)} className="hms-action-btn" title="Edit"><Edit size={14} /></button>
+                                                    <button onClick={() => openDeleteModal(item)} className="hms-action-btn danger" title="Delete"><Trash2 size={14} /></button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -1884,517 +3071,17 @@ const Inventory = () => {
                 )}
             </div>
 
-            {/* ============================================================ */}
-            {/* ===== ALL MODALS ===== */}
-            {/* ============================================================ */}
-
-            {/* Category Modal */}
-            {isCategoryOpen && (
-                <div className="hms-modal-backdrop" onClick={() => setIsCategoryOpen(false)}>
-                    <div className="hms-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>
-                        <div className="hms-modal-header">
-                            <h3 className="hms-modal-title"><Layers size={18} style={{ color: '#8B5CF6' }} /> Add Category</h3>
-                            <button onClick={() => setIsCategoryOpen(false)}><X size={18} /></button>
-                        </div>
-                        <div className="hms-modal-body">
-                            {errorMsg && <div className="alert alert-danger"><AlertCircle size={16} /> {errorMsg}</div>}
-                            {successMsg && <div className="alert alert-success"><Check size={16} /> {successMsg}</div>}
-                            <form onSubmit={handleCategorySubmit}>
-                                <div className="form-group">
-                                    <label>Category Name *</label>
-                                    <input type="text" name="name" value={categoryForm.name} onChange={handleCategoryChange} placeholder="e.g. Surgical Supplies" required />
-                                </div>
-                                <div className="form-group">
-                                    <label>Description</label>
-                                    <input type="text" name="description" value={categoryForm.description} onChange={handleCategoryChange} placeholder="Category description" />
-                                </div>
-                                <div className="form-group">
-                                    <label>Color</label>
-                                    <input type="color" name="color" value={categoryForm.color} onChange={handleCategoryChange} style={{ height: '40px', padding: '4px', cursor: 'pointer' }} />
-                                </div>
-                                <div className="hms-modal-footer">
-                                    <button type="button" onClick={() => setIsCategoryOpen(false)} className="btn-cancel">Cancel</button>
-                                    <button type="submit" disabled={actionLoading} className="btn-primary"><Layers size={14} /> {actionLoading ? 'Adding...' : 'Add Category'}</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Supplier Modal */}
-            {isSupplierOpen && (
-                <div className="hms-modal-backdrop" onClick={() => setIsSupplierOpen(false)}>
-                    <div className="hms-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '550px' }}>
-                        <div className="hms-modal-header">
-                            <h3 className="hms-modal-title"><Truck size={18} style={{ color: '#8B5CF6' }} /> Add Supplier</h3>
-                            <button onClick={() => setIsSupplierOpen(false)}><X size={18} /></button>
-                        </div>
-                        <div className="hms-modal-body">
-                            {errorMsg && <div className="alert alert-danger"><AlertCircle size={16} /> {errorMsg}</div>}
-                            {successMsg && <div className="alert alert-success"><Check size={16} /> {successMsg}</div>}
-                            <form onSubmit={handleSupplierSubmit}>
-                                <div className="form-group">
-                                    <label>Supplier Name *</label>
-                                    <input type="text" name="name" value={supplierForm.name} onChange={handleSupplierChange} placeholder="e.g. MediCare Supplies" required />
-                                </div>
-                                <div className="form-group">
-                                    <label>Contact Person</label>
-                                    <input type="text" name="contact_person" value={supplierForm.contact_person} onChange={handleSupplierChange} placeholder="e.g. Mr. Ahmed" />
-                                </div>
-                                <div className="form-grid-2">
-                                    <div className="form-group">
-                                        <label>Phone</label>
-                                        <input type="text" name="phone" value={supplierForm.phone} onChange={handleSupplierChange} placeholder="e.g. 051-1234567" />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Email</label>
-                                        <input type="email" name="email" value={supplierForm.email} onChange={handleSupplierChange} placeholder="info@supplier.com" />
-                                    </div>
-                                </div>
-                                <div className="form-group">
-                                    <label>Address</label>
-                                    <input type="text" name="address" value={supplierForm.address} onChange={handleSupplierChange} placeholder="Complete address" />
-                                </div>
-                                <div className="form-grid-2">
-                                    <div className="form-group">
-                                        <label>City</label>
-                                        <input type="text" name="city" value={supplierForm.city} onChange={handleSupplierChange} placeholder="e.g. Islamabad" />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Payment Terms</label>
-                                        <input type="text" name="payment_terms" value={supplierForm.payment_terms} onChange={handleSupplierChange} placeholder="e.g. Net 30 days" />
-                                    </div>
-                                </div>
-                                <div className="hms-modal-footer">
-                                    <button type="button" onClick={() => setIsSupplierOpen(false)} className="btn-cancel">Cancel</button>
-                                    <button type="submit" disabled={actionLoading} className="btn-primary"><Truck size={14} /> {actionLoading ? 'Adding...' : 'Add Supplier'}</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Add Item Modal */}
-            {isAddOpen && (
-                <div className="hms-modal-backdrop" onClick={() => setIsAddOpen(false)}>
-                    <div className="hms-modal" onClick={(e) => e.stopPropagation()}>
-                        <div className="hms-modal-header">
-                            <h3 className="hms-modal-title"><Package size={18} style={{ color: 'var(--primary-color)' }} /> Add Inventory Item</h3>
-                            <button onClick={() => setIsAddOpen(false)}><X size={18} /></button>
-                        </div>
-                        <div className="hms-modal-body">
-                            {errorMsg && <div className="alert alert-danger"><AlertCircle size={16} /> {errorMsg}</div>}
-                            {successMsg && <div className="alert alert-success"><Check size={16} /> {successMsg}</div>}
-                            <form onSubmit={handleAddSubmit}>
-                                <div className="form-grid-2">
-                                    <div className="form-group">
-                                        <label>Item Name *</label>
-                                        <input type="text" name="item_name" value={formData.item_name} onChange={handleFormChange} required />
-                                        {formErrors.item_name && <span className="error-text">{formErrors.item_name}</span>}
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Category *</label>
-                                        <select name="category" value={formData.category} onChange={handleFormChange} required>
-                                            <option value="">Select Category</option>
-                                            {categories.map(cat => (
-                                                <option key={cat.id} value={cat.name}>{cat.name}</option>
-                                            ))}
-                                        </select>
-                                        {formErrors.category && <span className="error-text">{formErrors.category}</span>}
-                                    </div>
-                                </div>
-
-                                <div className="form-grid-2">
-                                    <div className="form-group">
-                                        <label>Quantity *</label>
-                                        <input type="number" name="quantity" value={formData.quantity} onChange={handleFormChange} min="0" required />
-                                        {formErrors.quantity && <span className="error-text">{formErrors.quantity}</span>}
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Minimum Quantity</label>
-                                        <input type="number" name="minimum_quantity" value={formData.minimum_quantity} onChange={handleFormChange} min="0" />
-                                    </div>
-                                </div>
-
-                                <div className="form-grid-2">
-                                    <div className="form-group">
-                                        <label>Selling Price (Rs.) *</label>
-                                        <input type="number" name="price" value={formData.price} onChange={handleFormChange} step="0.01" min="0" required />
-                                        {formErrors.price && <span className="error-text">{formErrors.price}</span>}
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Cost Price (Rs.)</label>
-                                        <input type="number" name="cost_price" value={formData.cost_price} onChange={handleFormChange} step="0.01" min="0" />
-                                    </div>
-                                </div>
-
-                                <div className="form-grid-2">
-                                    <div className="form-group">
-                                        <label>Unit</label>
-                                        <select name="unit" value={formData.unit} onChange={handleFormChange}>
-                                            <option value="pcs">Pieces (pcs)</option>
-                                            <option value="box">Box</option>
-                                            <option value="pack">Pack</option>
-                                            <option value="bottle">Bottle</option>
-                                            <option value="strip">Strip</option>
-                                            <option value="vial">Vial</option>
-                                            <option value="ampoule">Ampoule</option>
-                                            <option value="tablet">Tablet</option>
-                                            <option value="capsule">Capsule</option>
-                                            <option value="ml">ML</option>
-                                            <option value="mg">MG</option>
-                                            <option value="g">Gram</option>
-                                            <option value="kg">KG</option>
-                                            <option value="roll">Roll</option>
-                                            <option value="sheet">Sheet</option>
-                                            <option value="set">Set</option>
-                                            <option value="pair">Pair</option>
-                                        </select>
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Supplier</label>
-                                        <select name="supplier_id" value={formData.supplier_id} onChange={handleFormChange}>
-                                            <option value="">Select Supplier</option>
-                                            {suppliers.map(s => (
-                                                <option key={s.id} value={s.id}>{s.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <div className="form-grid-2">
-                                    <div className="form-group">
-                                        <label>Location</label>
-                                        <input type="text" name="location" value={formData.location} onChange={handleFormChange} placeholder="e.g. Store Room A, Shelf 3" />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Batch Number</label>
-                                        <input type="text" name="batch_number" value={formData.batch_number} onChange={handleFormChange} placeholder="e.g. BATCH-2024-001" />
-                                    </div>
-                                </div>
-
-                                <div className="form-grid-2">
-                                    <div className="form-group">
-                                        <label>Expiry Date</label>
-                                        <input type="date" name="expiry_date" value={formData.expiry_date} onChange={handleFormChange} />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Reorder Point</label>
-                                        <input type="number" name="reorder_point" value={formData.reorder_point} onChange={handleFormChange} min="0" />
-                                    </div>
-                                </div>
-
-                                <div className="form-group full-width">
-                                    <label>Description / Notes</label>
-                                    <textarea name="notes" value={formData.notes} onChange={handleFormChange} placeholder="Additional notes..." rows={isMobile ? 2 : 3} />
-                                </div>
-
-                                <div className="hms-modal-footer">
-                                    <button type="button" onClick={() => setIsAddOpen(false)} className="btn-cancel">Cancel</button>
-                                    <button type="submit" disabled={actionLoading} className="btn-primary">
-                                        <Package size={14} /> {actionLoading ? 'Adding...' : 'Add Item'}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Edit Item Modal */}
-            {isEditOpen && selectedItem && (
-                <div className="hms-modal-backdrop" onClick={() => setIsEditOpen(false)}>
-                    <div className="hms-modal" onClick={(e) => e.stopPropagation()}>
-                        <div className="hms-modal-header">
-                            <h3 className="hms-modal-title"><Edit size={18} style={{ color: '#22C55E' }} /> Edit Item</h3>
-                            <button onClick={() => setIsEditOpen(false)}><X size={18} /></button>
-                        </div>
-                        <div className="hms-modal-body">
-                            {errorMsg && <div className="alert alert-danger"><AlertCircle size={16} /> {errorMsg}</div>}
-                            {successMsg && <div className="alert alert-success"><Check size={16} /> {successMsg}</div>}
-                            <form onSubmit={handleEditSubmit}>
-                                <div className="form-grid-2">
-                                    <div className="form-group">
-                                        <label>Item Name *</label>
-                                        <input type="text" name="item_name" value={formData.item_name} onChange={handleFormChange} required />
-                                        {formErrors.item_name && <span className="error-text">{formErrors.item_name}</span>}
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Category *</label>
-                                        <select name="category" value={formData.category} onChange={handleFormChange} required>
-                                            <option value="">Select Category</option>
-                                            {categories.map(cat => (
-                                                <option key={cat.id} value={cat.name}>{cat.name}</option>
-                                            ))}
-                                        </select>
-                                        {formErrors.category && <span className="error-text">{formErrors.category}</span>}
-                                    </div>
-                                </div>
-
-                                <div className="form-grid-2">
-                                    <div className="form-group">
-                                        <label>Quantity *</label>
-                                        <input type="number" name="quantity" value={formData.quantity} onChange={handleFormChange} min="0" required />
-                                        {formErrors.quantity && <span className="error-text">{formErrors.quantity}</span>}
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Minimum Quantity</label>
-                                        <input type="number" name="minimum_quantity" value={formData.minimum_quantity} onChange={handleFormChange} min="0" />
-                                    </div>
-                                </div>
-
-                                <div className="form-grid-2">
-                                    <div className="form-group">
-                                        <label>Selling Price (Rs.) *</label>
-                                        <input type="number" name="price" value={formData.price} onChange={handleFormChange} step="0.01" min="0" required />
-                                        {formErrors.price && <span className="error-text">{formErrors.price}</span>}
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Cost Price (Rs.)</label>
-                                        <input type="number" name="cost_price" value={formData.cost_price} onChange={handleFormChange} step="0.01" min="0" />
-                                    </div>
-                                </div>
-
-                                <div className="form-group full-width">
-                                    <label>Notes</label>
-                                    <textarea name="notes" value={formData.notes} onChange={handleFormChange} rows={2} />
-                                </div>
-
-                                <div className="hms-modal-footer">
-                                    <button type="button" onClick={() => setIsEditOpen(false)} className="btn-cancel">Cancel</button>
-                                    <button type="submit" disabled={actionLoading} className="btn-primary"><Save size={14} /> {actionLoading ? 'Saving...' : 'Update Item'}</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Restock Modal */}
-            {isRestockOpen && selectedItem && (
-                <div className="hms-modal-backdrop" onClick={() => setIsRestockOpen(false)}>
-                    <div className="hms-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>
-                        <div className="hms-modal-header">
-                            <h3 className="hms-modal-title"><PackageOpen size={18} style={{ color: '#8B5CF6' }} /> Restock Item</h3>
-                            <button onClick={() => setIsRestockOpen(false)}><X size={18} /></button>
-                        </div>
-                        <div className="hms-modal-body">
-                            {errorMsg && <div className="alert alert-danger"><AlertCircle size={16} /> {errorMsg}</div>}
-                            <div style={{ padding: '12px', background: 'var(--bg-primary)', borderRadius: '10px', border: '1px solid var(--border-color)', marginBottom: '16px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Item</span>
-                                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{selectedItem.item_name}</span>
-                                </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Current Quantity</span>
-                                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{selectedItem.quantity || 0} {selectedItem.unit || 'pcs'}</span>
-                                </div>
-                            </div>
-                            <form onSubmit={handleRestockSubmit}>
-                                <div className="form-group">
-                                    <label>Add Quantity *</label>
-                                    <input type="number" value={restockQty} onChange={(e) => setRestockQty(e.target.value)} placeholder="Enter quantity to add" min="1" required style={{ fontSize: '1.1rem' }} />
-                                </div>
-                                <div className="hms-modal-footer">
-                                    <button type="button" onClick={() => setIsRestockOpen(false)} className="btn-cancel">Cancel</button>
-                                    <button type="submit" disabled={actionLoading} className="btn-primary"><PackageOpen size={14} /> {actionLoading ? 'Restocking...' : 'Confirm Restock'}</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Delete Modal */}
-            {isDeleteOpen && selectedItem && (
-                <div className="hms-modal-backdrop" onClick={() => setIsDeleteOpen(false)}>
-                    <div className="hms-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
-                        <div className="hms-modal-header">
-                            <h3 className="hms-modal-title"><Trash2 size={18} style={{ color: 'var(--danger-color)' }} /> Delete Item</h3>
-                            <button onClick={() => setIsDeleteOpen(false)}><X size={18} /></button>
-                        </div>
-                        <div className="hms-modal-body" style={{ textAlign: 'center' }}>
-                            <div style={{ fontSize: '3rem', marginBottom: '12px' }}>⚠️</div>
-                            <p style={{ fontWeight: 600, fontSize: '1rem', marginBottom: '8px' }}>Are you sure you want to delete this item?</p>
-                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Item: <strong>{selectedItem.item_name}</strong><br />Category: <strong>{selectedItem.category || 'N/A'}</strong><br />Quantity: <strong>{selectedItem.quantity || 0} units</strong></p>
-                            <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '8px' }}>This action cannot be undone.</p>
-                        </div>
-                        <div className="hms-modal-footer" style={{ justifyContent: 'center' }}>
-                            <button type="button" onClick={() => setIsDeleteOpen(false)} className="btn-cancel">Cancel</button>
-                            <button onClick={handleDeleteSubmit} disabled={actionLoading} className="btn-danger"><Trash2 size={14} /> {actionLoading ? 'Deleting...' : 'Delete Permanently'}</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* View Item Modal */}
-            {isViewOpen && selectedItem && (
-                <div className="hms-modal-backdrop" onClick={() => setIsViewOpen(false)}>
-                    <div className="hms-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '550px' }}>
-                        <div className="hms-modal-header">
-                            <h3 className="hms-modal-title"><Package size={18} style={{ color: 'var(--primary-color)' }} /> Item Details</h3>
-                            <button onClick={() => setIsViewOpen(false)}><X size={18} /></button>
-                        </div>
-                        <div className="hms-modal-body">
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px' }}>
-                                <div style={{ padding: '10px', background: 'var(--bg-primary)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                                    <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>Item Name</div>
-                                    <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>{selectedItem.item_name}</div>
-                                </div>
-                                <div style={{ padding: '10px', background: 'var(--bg-primary)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                                    <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>Category</div>
-                                    <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>{selectedItem.category || 'N/A'}</div>
-                                </div>
-                                <div style={{ padding: '10px', background: 'var(--bg-primary)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                                    <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>Quantity</div>
-                                    <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>{selectedItem.quantity || 0} {selectedItem.unit || 'pcs'}</div>
-                                </div>
-                                <div style={{ padding: '10px', background: 'var(--bg-primary)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                                    <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>Price</div>
-                                    <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>Rs. {parseFloat(selectedItem.price || 0).toFixed(2)}</div>
-                                </div>
-                            </div>
-                            {selectedItem.notes && (
-                                <div style={{ padding: '10px', background: 'var(--bg-primary)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                                    <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>Notes</div>
-                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', marginTop: '4px' }}>{selectedItem.notes}</div>
-                                </div>
-                            )}
-                            <div className="hms-modal-footer">
-                                <button onClick={() => { setIsViewOpen(false); openHistoryModal(selectedItem); }} className="btn-primary"><History size={14} /> History</button>
-                                <button onClick={() => { setIsViewOpen(false); openEditModal(selectedItem); }} className="btn-edit"><Edit size={14} /> Edit</button>
-                                <button onClick={() => { setIsViewOpen(false); openRestockModal(selectedItem); }} className="btn-success"><PackageOpen size={14} /> Restock</button>
-                                <button onClick={() => setIsViewOpen(false)} className="btn-cancel">Close</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Restock History Modal */}
-            {isHistoryOpen && selectedItem && (
-                <div className="hms-modal-backdrop" onClick={() => setIsHistoryOpen(false)}>
-                    <div className="hms-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px' }}>
-                        <div className="hms-modal-header">
-                            <h3 className="hms-modal-title"><History size={18} style={{ color: '#8B5CF6' }} /> Restock History - {selectedItem.item_name}</h3>
-                            <button onClick={() => setIsHistoryOpen(false)}><X size={18} /></button>
-                        </div>
-                        <div className="hms-modal-body">
-                            {selectedHistory.length === 0 ? (
-                                <div style={{ textAlign: 'center', padding: '40px' }}><div style={{ fontSize: '3rem', marginBottom: '12px' }}>📦</div><h3>No Restock History</h3><p>This item has not been restocked yet.</p></div>
-                            ) : (
-                                <div style={{ overflowX: 'auto' }}>
-                                    <table className="hms-table">
-                                        <thead>
-                                            <tr><th>Date</th><th style={{ textAlign: 'center' }}>Quantity</th><th style={{ textAlign: 'center' }}>Previous Qty</th><th style={{ textAlign: 'center' }}>New Qty</th><th>Reason</th></tr>
-                                        </thead>
-                                        <tbody>
-                                            {selectedHistory.map((movement, index) => (
-                                                <tr key={index}>
-                                                    <td style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{new Date(movement.created_at).toLocaleString()}</td>
-                                                    <td style={{ textAlign: 'center', fontWeight: 600, color: '#8B5CF6' }}>+{movement.quantity}</td>
-                                                    <td style={{ textAlign: 'center' }}>{movement.previous_quantity}</td>
-                                                    <td style={{ textAlign: 'center', fontWeight: 600, color: '#10B981' }}>{movement.new_quantity}</td>
-                                                    <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{movement.reason || 'Restock'}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </div>
-                        <div className="hms-modal-footer"><button onClick={() => setIsHistoryOpen(false)} className="btn-cancel">Close</button></div>
-                    </div>
-                </div>
-            )}
-
-            {/* Payment History Modal */}
-            {isPaymentHistoryOpen && (
-                <div className="hms-modal-backdrop" onClick={() => setIsPaymentHistoryOpen(false)}>
-                    <div className="hms-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px' }}>
-                        <div className="hms-modal-header">
-                            <h3 className="hms-modal-title"><Wallet size={18} style={{ color: '#10B981' }} /> Payment History</h3>
-                            <button onClick={() => setIsPaymentHistoryOpen(false)}><X size={18} /></button>
-                        </div>
-                        <div className="hms-modal-body">
-                            {payments.length === 0 ? (
-                                <div style={{ textAlign: 'center', padding: '40px' }}><div style={{ fontSize: '3rem', marginBottom: '12px' }}>💰</div><h3>No Payments Recorded</h3><p>No supplier payments have been recorded yet.</p></div>
-                            ) : (
-                                <div style={{ overflowX: 'auto' }}>
-                                    <table className="hms-table">
-                                        <thead>
-                                            <tr><th>Supplier</th><th>Amount</th><th>Method</th><th>Date</th><th>Status</th><th>Reference</th></tr>
-                                        </thead>
-                                        <tbody>
-                                            {payments.map((payment, index) => (
-                                                <tr key={index}>
-                                                    <td style={{ fontWeight: 600 }}>{payment.suppliers?.name || 'N/A'}</td>
-                                                    <td style={{ fontWeight: 600, color: '#10B981' }}>Rs. {parseFloat(payment.amount).toFixed(2)}</td>
-                                                    <td>{payment.payment_method || 'N/A'}</td>
-                                                    <td style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{new Date(payment.payment_date).toLocaleDateString()}</td>
-                                                    <td><span style={{ padding: '2px 10px', borderRadius: '20px', fontSize: '0.65rem', fontWeight: 600, background: payment.status === 'paid' ? '#10B98115' : '#F59E0B15', color: payment.status === 'paid' ? '#10B981' : '#F59E0B', border: `1px solid ${payment.status === 'paid' ? '#10B981' : '#F59E0B'}30` }}>{payment.status === 'paid' ? '✅ Paid' : '⏳ Pending'}</span></td>
-                                                    <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{payment.reference || 'N/A'}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                            <div style={{ marginTop: '16px', padding: '12px', background: 'var(--bg-primary)', borderRadius: '10px', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between' }}>
-                                <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Total Paid:</span>
-                                <span style={{ fontWeight: 700, color: '#10B981', fontSize: '1.1rem' }}>Rs. {stats.totalPaidAmount.toFixed(2)}</span>
-                            </div>
-                        </div>
-                        <div className="hms-modal-footer"><button onClick={() => setIsPaymentHistoryOpen(false)} className="btn-cancel">Close</button></div>
-                    </div>
-                </div>
-            )}
-
-            {/* Low Stock Alert Modal */}
-            {isLowStockOpen && (
-                <div className="hms-modal-backdrop" onClick={() => setIsLowStockOpen(false)}>
-                    <div className="hms-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px' }}>
-                        <div className="hms-modal-header">
-                            <h3 className="hms-modal-title"><AlertCircle size={18} style={{ color: '#F59E0B' }} /> Low Stock Alert</h3>
-                            <button onClick={() => setIsLowStockOpen(false)}><X size={18} /></button>
-                        </div>
-                        <div className="hms-modal-body">
-                            {lowStockItems.length === 0 ? (
-                                <div style={{ textAlign: 'center', padding: '40px' }}><div style={{ fontSize: '3rem', marginBottom: '12px' }}>✅</div><h3>All items are well stocked!</h3><p>No low stock items found.</p></div>
-                            ) : (
-                                <div style={{ overflowX: 'auto' }}>
-                                    <table className="hms-table">
-                                        <thead>
-                                            <tr><th>Item</th><th>Category</th><th style={{ textAlign: 'center' }}>Current Qty</th><th style={{ textAlign: 'center' }}>Min Qty</th><th style={{ textAlign: 'center' }}>Status</th><th style={{ textAlign: 'right' }}>Action</th></tr>
-                                        </thead>
-                                        <tbody>
-                                            {lowStockItems.map(item => {
-                                                const status = getStockStatus(item);
-                                                return (
-                                                    <tr key={item.id}>
-                                                        <td style={{ fontWeight: 600 }}>{item.item_name}</td>
-                                                        <td>{item.category || 'N/A'}</td>
-                                                        <td style={{ textAlign: 'center' }}>{item.quantity}</td>
-                                                        <td style={{ textAlign: 'center' }}>{item.minimum_quantity}</td>
-                                                        <td style={{ textAlign: 'center' }}><span style={{ padding: '2px 10px', borderRadius: '20px', fontSize: '0.65rem', fontWeight: 600, background: status.bg, color: status.color, border: `1px solid ${status.color}30` }}>{status.icon} {status.label}</span></td>
-                                                        <td style={{ textAlign: 'right' }}>
-                                                            <button onClick={() => { setIsLowStockOpen(false); openRestockModal(item); }} className="btn-primary" style={{ padding: '4px 12px', fontSize: '0.7rem' }}><PackageOpen size={14} /> Restock</button>
-                                                            <button onClick={() => { setIsLowStockOpen(false); openHistoryModal(item); }} className="btn-edit" style={{ padding: '4px 12px', fontSize: '0.7rem', marginLeft: '4px' }}><History size={14} /> History</button>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </div>
-                        <div className="hms-modal-footer"><button onClick={() => setIsLowStockOpen(false)} className="btn-cancel">Close</button></div>
-                    </div>
-                </div>
-            )}
+            {/* ===== MODALS ===== */}
+            {isCategoryOpen && <CategoryModal />}
+            {isSupplierOpen && <SupplierModal />}
+            {isAddOpen && <AddItemModal />}
+            {isEditOpen && <EditItemModal />}
+            {isRestockOpen && <RestockModal />}
+            {isDeleteOpen && <DeleteModal />}
+            {isViewOpen && <ViewItemModal />}
+            {isHistoryOpen && <HistoryModal />}
+            {isPaymentHistoryOpen && <PaymentHistoryModal />}
+            {isLowStockOpen && <LowStockModal />}
 
             <style>{`
                 .spinner { animation: spin 1s linear infinite; }
@@ -2402,114 +3089,209 @@ const Inventory = () => {
                 @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
                 @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
                 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-                .hms-modal-backdrop {
-                    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-                    background: rgba(0,0,0,0.6); z-index: 9999;
-                    display: flex; align-items: center; justify-content: center;
-                    padding: 20px; backdrop-filter: blur(4px); animation: fadeIn 0.3s ease;
-                }
-
-                .hms-modal {
-                    background: var(--card-bg); border-radius: 16px;
-                    max-width: 700px; width: 100%; max-height: 90vh;
-                    display: flex; flex-direction: column;
-                    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-                    border: 1px solid var(--border-color); margin: 16px;
-                    animation: fadeIn 0.3s ease;
-                }
-
-                .hms-modal-header {
-                    display: flex; justify-content: space-between; align-items: center;
-                    padding: 16px 20px; border-bottom: 1px solid var(--border-color);
-                    background: var(--bg-primary); border-radius: 16px 16px 0 0;
-                    flex-shrink: 0;
-                }
-
-                .hms-modal-title {
-                    font-size: 1rem; font-weight: 600; margin: 0;
-                    display: flex; align-items: center; gap: 8px;
-                    color: var(--text-primary);
-                }
-
-                .hms-modal-body {
-                    padding: 20px; overflow-y: auto; flex: 1;
-                }
-
-                .hms-modal-footer {
-                    display: flex; justify-content: flex-end; gap: 8px;
-                    padding: 14px 20px; border-top: 1px solid var(--border-color);
-                    background: var(--bg-primary); border-radius: 0 0 16px 16px;
-                    flex-shrink: 0; flex-wrap: wrap;
-                    margin-top: 16px;
-                }
+                @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 
                 .hms-table-container {
-                    border-radius: 12px; overflow: hidden;
-                    background: var(--card-bg); border: 1px solid var(--border-color);
+                    border-radius: 12px;
+                    overflow: hidden;
+                    background: var(--card-bg);
+                    border: 1px solid var(--border-color);
                     box-shadow: var(--shadow-sm);
                 }
 
-                .hms-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; min-width: 700px; }
-                .hms-table th { padding: 10px 14px; text-align: left; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); background: var(--bg-primary); border-bottom: 2px solid var(--border-color); }
-                .hms-table td { padding: 8px 14px; border-bottom: 1px solid var(--border-color); }
-                .hms-table tbody tr:hover { background: var(--hover-bg); }
+                .hms-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 0.8rem;
+                    min-width: 700px;
+                }
+
+                .hms-table th {
+                    padding: 10px 14px;
+                    text-align: left;
+                    font-size: 0.65rem;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    color: var(--text-secondary);
+                    background: var(--bg-primary);
+                    border-bottom: 2px solid var(--border-color);
+                }
+
+                .hms-table td {
+                    padding: 8px 14px;
+                    border-bottom: 1px solid var(--border-color);
+                }
+
+                .hms-table tbody tr:hover {
+                    background: var(--hover-bg);
+                }
 
                 .hms-action-btn {
-                    padding: 4px 6px; border: 1px solid var(--border-color);
-                    border-radius: 6px; background: transparent; cursor: pointer;
-                    color: var(--text-secondary); transition: all 0.2s ease;
-                    display: inline-flex; align-items: center; gap: 3px;
+                    padding: 4px 6px;
+                    border: 1px solid var(--border-color);
+                    border-radius: 6px;
+                    background: transparent;
+                    cursor: pointer;
+                    color: var(--text-secondary);
+                    transition: all 0.2s ease;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 3px;
                 }
-                .hms-action-btn:hover { border-color: var(--primary-color); color: var(--primary-color); background: rgba(37,99,235,0.04); }
-                .hms-action-btn.success:hover { border-color: #8B5CF6; color: #8B5CF6; background: rgba(139,92,246,0.04); }
-                .hms-action-btn.danger:hover { border-color: #EF4444; color: #EF4444; background: rgba(239,68,68,0.04); }
 
-                .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-                .form-group { margin-bottom: 12px; }
-                .form-group label { display: block; font-size: 0.75rem; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px; }
-                .form-group input, .form-group select, .form-group textarea {
-                    width: 100%; height: 40px; padding: 0 12px;
-                    border: 1.5px solid var(--border-color); border-radius: 8px;
-                    font-family: var(--font-family); font-size: 0.8rem;
-                    background: var(--card-bg); color: var(--text-primary);
-                    outline: none; transition: all 0.2s ease;
+                .hms-action-btn:hover {
+                    border-color: var(--primary-color);
+                    color: var(--primary-color);
+                    background: rgba(37, 99, 235, 0.04);
                 }
-                .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
-                    border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+
+                .hms-action-btn.success:hover {
+                    border-color: #8B5CF6;
+                    color: #8B5CF6;
+                    background: rgba(139, 92, 246, 0.04);
                 }
-                .form-group textarea { height: auto; padding: 8px 12px; resize: vertical; }
-                .full-width { grid-column: 1 / -1; }
-                .error-text { font-size: 0.7rem; color: var(--danger-color); }
 
-                .alert { padding: 10px 14px; border-radius: 8px; display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 0.85rem; }
-                .alert-danger { background: #EF444415; border: 1px solid #EF444430; color: #EF4444; }
-                .alert-success { background: #22C55E15; border: 1px solid #22C55E30; color: #16A34A; }
+                .hms-action-btn.danger:hover {
+                    border-color: #EF4444;
+                    color: #EF4444;
+                    background: rgba(239, 68, 68, 0.04);
+                }
 
-                .btn-cancel { padding: 6px 16px; border: 1.5px solid var(--border-color); border-radius: 8px; background: transparent; cursor: pointer; font-size: 0.8rem; font-family: var(--font-family); color: var(--text-secondary); transition: all 0.2s ease; }
-                .btn-cancel:hover { background: var(--hover-bg); color: var(--text-primary); }
-                .btn-primary { padding: 6px 16px; border: none; border-radius: 8px; background: var(--primary-color); cursor: pointer; font-size: 0.8rem; font-family: var(--font-family); color: white; font-weight: 500; display: flex; align-items: center; gap: 6px; transition: all 0.2s ease; }
-                .btn-primary:hover:not(:disabled) { background: var(--primary-hover); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(37,99,235,0.25); }
-                .btn-primary:disabled { opacity: 0.7; cursor: not-allowed; }
-                .btn-success { padding: 6px 16px; border: none; border-radius: 8px; background: #10B981; cursor: pointer; font-size: 0.8rem; font-family: var(--font-family); color: white; font-weight: 500; display: flex; align-items: center; gap: 6px; transition: all 0.2s ease; }
-                .btn-success:hover:not(:disabled) { background: #059669; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(16,185,129,0.25); }
-                .btn-danger { padding: 6px 16px; border: none; border-radius: 8px; background: var(--danger-color); cursor: pointer; font-size: 0.8rem; font-family: var(--font-family); color: white; font-weight: 500; display: flex; align-items: center; gap: 6px; transition: all 0.2s ease; }
-                .btn-danger:hover:not(:disabled) { background: var(--danger-hover); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(239,68,68,0.25); }
-                .btn-edit { padding: 6px 16px; border: 1.5px solid var(--border-color); border-radius: 8px; background: transparent; cursor: pointer; font-size: 0.8rem; font-family: var(--font-family); color: var(--text-secondary); display: flex; align-items: center; gap: 6px; transition: all 0.2s ease; }
-                .btn-edit:hover { border-color: #22C55E; color: #22C55E; background: rgba(34,197,94,0.04); }
+                .btn-cancel {
+                    padding: 6px 16px;
+                    border: 1.5px solid var(--border-color);
+                    border-radius: 8px;
+                    background: transparent;
+                    cursor: pointer;
+                    font-size: 0.8rem;
+                    font-family: var(--font-family);
+                    color: var(--text-secondary);
+                    transition: all 0.2s ease;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    justify-content: center;
+                }
 
+                .btn-cancel:hover {
+                    background: var(--hover-bg);
+                    color: var(--text-primary);
+                }
+
+                .btn-primary {
+                    padding: 6px 16px;
+                    border: none;
+                    border-radius: 8px;
+                    background: var(--primary-color);
+                    cursor: pointer;
+                    font-size: 0.8rem;
+                    font-family: var(--font-family);
+                    color: white;
+                    font-weight: 500;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    transition: all 0.2s ease;
+                    justify-content: center;
+                }
+
+                .btn-primary:hover:not(:disabled) {
+                    background: var(--primary-hover);
+                    transform: translateY(-1px);
+                    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+                }
+
+                .btn-primary:disabled {
+                    opacity: 0.7;
+                    cursor: not-allowed;
+                }
+
+                .btn-success {
+                    padding: 6px 16px;
+                    border: none;
+                    border-radius: 8px;
+                    background: #10B981;
+                    cursor: pointer;
+                    font-size: 0.8rem;
+                    font-family: var(--font-family);
+                    color: white;
+                    font-weight: 500;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    transition: all 0.2s ease;
+                    justify-content: center;
+                }
+
+                .btn-success:hover:not(:disabled) {
+                    background: #059669;
+                    transform: translateY(-1px);
+                    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+                }
+
+                .btn-danger {
+                    padding: 6px 16px;
+                    border: none;
+                    border-radius: 8px;
+                    background: var(--danger-color);
+                    cursor: pointer;
+                    font-size: 0.8rem;
+                    font-family: var(--font-family);
+                    color: white;
+                    font-weight: 500;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    transition: all 0.2s ease;
+                    justify-content: center;
+                }
+
+                .btn-danger:hover:not(:disabled) {
+                    background: var(--danger-hover);
+                    transform: translateY(-1px);
+                    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
+                }
+
+                .btn-edit {
+                    padding: 6px 16px;
+                    border: 1.5px solid var(--border-color);
+                    border-radius: 8px;
+                    background: transparent;
+                    cursor: pointer;
+                    font-size: 0.8rem;
+                    font-family: var(--font-family);
+                    color: var(--text-secondary);
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    transition: all 0.2s ease;
+                    justify-content: center;
+                }
+
+                .btn-edit:hover {
+                    border-color: #22C55E;
+                    color: #22C55E;
+                    background: rgba(34, 197, 94, 0.04);
+                }
+
+                /* ===== RESPONSIVE TABLES ===== */
                 @media (max-width: 768px) {
-                    .hms-modal-backdrop { padding: 0; align-items: flex-end; }
-                    .hms-modal { margin: 0; border-radius: 16px 16px 0 0; max-height: 95vh; animation: slideUp 0.3s ease; max-width: 100%; }
-                    .hms-modal-header { padding: 12px 16px; }
-                    .hms-modal-body { padding: 14px; }
-                    .hms-modal-footer { padding: 12px 16px; flex-direction: column; }
-                    .hms-modal-footer button { width: 100%; justify-content: center; padding: 12px; }
+                    .hms-table-container { border-radius: 8px; }
                     .hms-table { min-width: 500px; font-size: 0.7rem; }
-                    .form-grid-2 { grid-template-columns: 1fr; }
+                    .hms-table th, .hms-table td { padding: 6px 10px; }
+                    .btn-cancel, .btn-primary, .btn-success, .btn-danger, .btn-edit {
+                        width: 100%;
+                        justify-content: center;
+                        padding: 10px 16px;
+                    }
                 }
 
-                /* Print Styles */
+                @media (max-width: 480px) {
+                    .hms-table { min-width: 400px; font-size: 0.65rem; }
+                    .hms-table th, .hms-table td { padding: 4px 8px; }
+                    .hms-action-btn { padding: 3px 4px; font-size: 0.6rem; }
+                }
+
                 @media print {
                     .hms-modal-backdrop { display: none !important; }
                     .hms-modal { max-width: 100% !important; box-shadow: none !important; border: none !important; }

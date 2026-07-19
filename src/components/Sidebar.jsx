@@ -3,7 +3,9 @@ import {
     LayoutDashboard, Users, Stethoscope, Calendar,
     FileText, CreditCard, Package, Pill,
     BarChart3, UserCog, BookOpen, LogOut,
-    ChevronDown, Sun, Moon, X, Activity
+    ChevronDown, Sun, Moon, X, Activity,
+    Settings, Clipboard, Syringe, HeartPulse,
+    Hospital, FileSpreadsheet, Wrench, Cog
 } from 'lucide-react';
 
 const Sidebar = ({
@@ -30,7 +32,7 @@ const Sidebar = ({
                 { id: 'doctors', icon: Stethoscope, label: 'Doctors' },
                 { id: 'appointments', icon: Calendar, label: 'Appointments' },
                 { id: 'prescriptions', icon: FileText, label: 'Prescriptions' },
-                { id: 'vitals', icon: Activity, label: 'Vitals' }  // ← ADDED VITALS
+                { id: 'vitals', icon: Activity, label: 'Vitals' }
             ]
         },
         {
@@ -72,7 +74,7 @@ const Sidebar = ({
             </div>
 
             {/* USER */}
-            <div className="sidebar-user">
+            <div className="sidebar-user" style={{ cursor: 'pointer' }} onClick={() => handleNavClick('profile')}>
                 <div className="sidebar-avatar">{userInitial}</div>
                 <div className="sidebar-user-info">
                     <div className="sidebar-user-name">{userName}</div>
@@ -104,7 +106,7 @@ const Sidebar = ({
                 ))}
             </nav>
 
-            {/* FOOTER */}
+            {/* ===== FOOTER WITH SETTINGS ===== */}
             <div className="sidebar-footer">
                 <button className="theme-toggle-btn" onClick={toggleTheme}>
                     {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
@@ -112,6 +114,16 @@ const Sidebar = ({
                         {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
                     </span>
                 </button>
+
+                {/* Settings */}
+                <div
+                    className={`sidebar-footer-item ${active === 'settings' ? 'active' : ''}`}
+                    onClick={() => handleNavClick('settings')}
+                    style={{ cursor: 'pointer' }}
+                >
+                    <Settings size={18} />
+                    <span className="footer-label">Settings</span>
+                </div>
 
                 <div className="sidebar-footer-item" onClick={() => window.open('/handbook.pdf', '_blank')}>
                     <BookOpen size={18} />

@@ -68,8 +68,8 @@ const Sidebar = ({
             {/* LOGO */}
             <div className="sidebar-brand">
                 <div className="auth-logo">
-                    <span className="auth-logo-icon">🏥 </span>
-                    <span>   Subhan Care</span>
+                    <Activity className="auth-logo-icon" size={28} />
+                    <span>Subhan Care</span>
                 </div>
             </div>
 

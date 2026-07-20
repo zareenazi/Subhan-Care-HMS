@@ -7,7 +7,11 @@ import {
   Stethoscope, Clock, ArrowLeft, ChevronRight, Activity,
   User, Settings, HelpCircle, ChevronDown, UserCircle,
   ClipboardPlus, Activity as VitalIcon, FilePlus, Star,
-  Pill, List, Eye, RefreshCw
+  Pill, List, Eye, RefreshCw, Plus, Edit2, Trash2,
+  Check, X, TrendingUp, TrendingDown, Zap, Home,
+  ArrowRight, Sparkles, AlertTriangle,
+  CheckCircle, Bell, MessageSquare, Award,
+  CalendarDays, Building, Phone, Mail
 } from 'lucide-react';
 import Sidebar from '../../components/Sidebar';
 import SidebarOverlay from '../../components/SidebarOverlay';
@@ -17,6 +21,7 @@ const DoctorDashboard = () => {
   const { user, signOut, loading } = useAuth();
   const navigate = useNavigate();
 
+  // ===== UI STATE =====
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentDate, setCurrentDate] = useState('');
   const [currentTime, setCurrentTime] = useState('');
@@ -26,18 +31,33 @@ const DoctorDashboard = () => {
   const [error, setError] = useState(null);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const dropdownRef = useRef(null);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [showNotifications, setShowNotifications] = useState(false);
 
-  // ===== REAL DATA =====
+  // ===== DATA STATE =====
   const [statsData, setStatsData] = useState({
     appointmentsToday: 0,
     activeConsultations: 0,
     prescriptionsIssued: 0,
-    totalPatients: 0
+    totalPatients: 0,
+    totalAppointments: 0,
+    completedAppointments: 0,
+    cancelledAppointments: 0,
+    weeklyAppointments: 0,
+    monthlyAppointments: 0,
+    totalPrescriptions: 0,
+    patientsToday: 0,
+    satisfactionRate: 0
   });
 
   const [recentPatients, setRecentPatients] = useState([]);
   const [upcomingAppointments, setUpcomingAppointments] = useState([]);
   const [allAppointments, setAllAppointments] = useState([]);
+  const [allPatients, setAllPatients] = useState([]);
+  const [allPrescriptions, setAllPrescriptions] = useState([]);
+  const [recentActivities, setRecentActivities] = useState([]);
+  const [todayAppointments, setTodayAppointments] = useState([]);
+  const [notifications, setNotifications] = useState([]);
 
   // ===== STATUS COLORS =====
   const statusColors = {
@@ -50,6 +70,7 @@ const DoctorDashboard = () => {
     teal: '#14B8A6'
   };
 
+  // ===== THEME =====
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') || 'light';
     setTheme(savedTheme);
@@ -66,6 +87,14 @@ const DoctorDashboard = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
@@ -73,10 +102,13 @@ const DoctorDashboard = () => {
     document.documentElement.setAttribute('data-theme', newTheme);
   };
 
-  const userName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Guest';
+  const userName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Doctor';
   const userRole = user?.user_metadata?.role || 'Doctor';
   const userEmail = user?.email || '';
   const userInitial = userName.charAt(0).toUpperCase();
+  const doctorSpecialization = user?.user_metadata?.specialization || 'General Physician';
+  const doctorDepartment = user?.user_metadata?.department || 'General Medicine';
+  const doctorExperience = user?.user_metadata?.experience || '5+ years';
 
   useEffect(() => {
     const updateDateTime = () => {
@@ -85,25 +117,55 @@ const DoctorDashboard = () => {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
       }));
       setCurrentTime(now.toLocaleTimeString('en-US', {
-        hour: '2-digit', minute: '2-digit'
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
       }));
     };
     updateDateTime();
-    const interval = setInterval(updateDateTime, 60000);
+    const interval = setInterval(updateDateTime, 1000);
     return () => clearInterval(interval);
   }, []);
 
-  // ===== FETCH REAL DATA (FIXED) =====
+  // ===== FETCH REAL DATA =====
   const fetchDoctorData = async () => {
     setIsLoading(true);
     setError(null);
     try {
       const today = new Date().toISOString().split('T')[0];
       const doctorId = user?.id;
+      const weekStart = new Date();
+      weekStart.setDate(weekStart.getDate() - 7);
+      const weekStartStr = weekStart.toISOString().split('T')[0];
+      const monthStart = new Date();
+      monthStart.setDate(1);
+      const monthStartStr = monthStart.toISOString().split('T')[0];
 
       console.log('🔍 Fetching data for doctor ID:', doctorId);
 
-      // ===== GET ALL APPOINTMENTS =====
+      // ===== 1. ALL PATIENTS =====
+      const { data: patientsData, count: totalPatientsCount, error: patientsError } = await supabase
+        .from('patients')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false });
+
+      if (patientsError) {
+        console.error('❌ Error fetching patients:', patientsError);
+        setAllPatients([]);
+      } else {
+        console.log('✅ All patients loaded:', patientsData?.length || 0);
+        setAllPatients(patientsData || []);
+        setRecentPatients((patientsData || []).slice(0, 5));
+
+        const patientsToday = (patientsData || []).filter(p =>
+          p.created_at && p.created_at.startsWith(today)
+        ).length;
+        setStatsData(prev => ({
+          ...prev,
+          totalPatients: patientsData?.length || 0,
+          patientsToday: patientsToday
+        }));
+      }
+
+      // ===== 2. ALL APPOINTMENTS =====
       const { data: allAppts, error: allAppError } = await supabase
         .from('appointments')
         .select(`
@@ -111,104 +173,151 @@ const DoctorDashboard = () => {
           patients (
             id,
             name,
-            phone
+            phone,
+            email
           )
-        `);
+        `)
+        .order('appointment_date', { ascending: false });
 
       if (allAppError) {
         console.error('❌ Error fetching appointments:', allAppError);
+        setAllAppointments([]);
       } else {
         console.log('✅ All appointments loaded:', allAppts?.length || 0);
         setAllAppointments(allAppts || []);
       }
 
-      // ===== FILTER APPOINTMENTS FOR THIS DOCTOR =====
+      // ===== FILTER APPOINTMENTS =====
       let doctorAppointments = [];
       if (allAppts) {
         doctorAppointments = allAppts.filter(app => app.doctor_id === doctorId);
+        if (doctorAppointments.length === 0 && allAppts.length > 0) {
+          console.log('⚠️ No appointments found for this doctor, showing all for testing');
+          doctorAppointments = allAppts;
+        }
         console.log('✅ Doctor appointments filtered:', doctorAppointments.length);
       }
 
-      // If no appointments found with doctor_id, try to show all (for testing)
-      if (doctorAppointments.length === 0 && allAppts?.length > 0) {
-        console.log('⚠️ No appointments found for this doctor, showing all for testing');
-        doctorAppointments = allAppts;
-      }
-
       // ===== TODAY'S APPOINTMENTS =====
-      const todayAppointments = doctorAppointments.filter(app => app.appointment_date === today);
-      console.log('✅ Today appointments:', todayAppointments.length);
+      const todayAppts = doctorAppointments.filter(app => app.appointment_date === today);
+      setTodayAppointments(todayAppts);
 
       // ===== ACTIVE CONSULTATIONS =====
-      const activeAppointments = doctorAppointments.filter(app =>
+      const activeAppts = doctorAppointments.filter(app =>
         app.status === 'scheduled' || app.status === 'in-progress'
       );
-      console.log('✅ Active appointments:', activeAppointments.length);
 
-      // ===== GET PRESCRIPTIONS (FIXED) =====
-      console.log('🔍 Fetching prescriptions for doctor:', doctorId);
+      // ===== COMPLETED APPOINTMENTS =====
+      const completedAppts = doctorAppointments.filter(app => app.status === 'completed');
 
-      // First, get all prescriptions
-      const { data: allPrescriptions, error: prescriptionsError } = await supabase
-        .from('prescriptions')
-        .select('*');
+      // ===== CANCELLED APPOINTMENTS =====
+      const cancelledAppts = doctorAppointments.filter(app => app.status === 'cancelled');
 
-      if (prescriptionsError) {
-        console.error('❌ Error fetching prescriptions:', prescriptionsError);
-      } else {
-        console.log('✅ All prescriptions loaded:', allPrescriptions?.length || 0);
-      }
-
-      // Filter prescriptions for this doctor
-      let doctorPrescriptions = [];
-      if (allPrescriptions) {
-        doctorPrescriptions = allPrescriptions.filter(p => p.doctor_id === doctorId);
-        console.log('✅ Doctor prescriptions filtered:', doctorPrescriptions.length);
-      }
-
-      // If no prescriptions found with doctor_id, use all (for testing)
-      if (doctorPrescriptions.length === 0 && allPrescriptions?.length > 0) {
-        console.log('⚠️ No prescriptions found for this doctor, showing all for testing');
-        doctorPrescriptions = allPrescriptions;
-      }
-
-      const prescriptionsCount = doctorPrescriptions.length;
-      console.log('✅ Prescriptions count:', prescriptionsCount);
-
-      // ===== TOTAL PATIENTS =====
-      const uniquePatients = new Set(doctorAppointments.map(item => item.patient_id).filter(Boolean));
-      const totalPatients = uniquePatients.size;
-      console.log('✅ Total patients:', totalPatients);
-
-      // ===== RECENT PATIENTS =====
-      const { data: recentPatientsData, error: recentError } = await supabase
-        .from('patients')
-        .select('id, name, phone, created_at')
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-      if (recentError) {
-        console.error('❌ Error fetching recent patients:', recentError);
-      }
+      // ===== WEEKLY & MONTHLY =====
+      const weeklyAppts = doctorAppointments.filter(app => app.appointment_date >= weekStartStr);
+      const monthlyAppts = doctorAppointments.filter(app => app.appointment_date >= monthStartStr);
 
       // ===== UPCOMING APPOINTMENTS =====
-      const upcomingAppts = doctorAppointments
+      const upcoming = doctorAppointments
         .filter(app => app.appointment_date >= today)
         .sort((a, b) => a.appointment_date.localeCompare(b.appointment_date))
         .slice(0, 5);
+      setUpcomingAppointments(upcoming);
 
-      console.log('✅ Upcoming appointments:', upcomingAppts.length);
+      // ===== PRESCRIPTIONS =====
+      const { data: prescriptionsData, error: prescriptionsError } = await supabase
+        .from('prescriptions')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (prescriptionsError) {
+        console.error('❌ Error fetching prescriptions:', prescriptionsError);
+        setAllPrescriptions([]);
+      } else {
+        console.log('✅ Prescriptions loaded:', prescriptionsData?.length || 0);
+        setAllPrescriptions(prescriptionsData || []);
+      }
+
+      let doctorPrescriptions = [];
+      if (prescriptionsData) {
+        doctorPrescriptions = prescriptionsData.filter(p => p.doctor_id === doctorId);
+        if (doctorPrescriptions.length === 0 && prescriptionsData.length > 0) {
+          doctorPrescriptions = prescriptionsData;
+        }
+      }
+
+      // ===== NOTIFICATIONS =====
+      const notifs = [];
+      if (todayAppts.length > 0) {
+        notifs.push({
+          id: '1',
+          icon: Calendar,
+          title: `${todayAppts.length} appointments today`,
+          time: 'Just now',
+          color: statusColors.primary,
+          read: false
+        });
+      }
+      if (completedAppts.length > 0) {
+        notifs.push({
+          id: '2',
+          icon: CheckCircle,
+          title: `${completedAppts.length} appointments completed`,
+          time: 'Today',
+          color: statusColors.success,
+          read: false
+        });
+      }
+      if (doctorPrescriptions.length > 0) {
+        notifs.push({
+          id: '3',
+          icon: FileText,
+          title: `${doctorPrescriptions.length} prescriptions issued`,
+          time: 'This month',
+          color: statusColors.purple,
+          read: false
+        });
+      }
+      setNotifications(notifs);
+
+      // ===== RECENT ACTIVITIES =====
+      const activities = [];
+      (patientsData || []).slice(0, 3).forEach(p => {
+        activities.push({
+          id: p.id,
+          type: 'patient',
+          title: `New patient registered: ${p.name}`,
+          time: p.created_at,
+          status: 'registered'
+        });
+      });
+      (doctorAppointments || []).slice(0, 3).forEach(a => {
+        const patientName = a.patients?.name || 'Patient';
+        activities.push({
+          id: a.id,
+          type: 'appointment',
+          title: `Appointment ${a.status} for ${patientName}`,
+          time: a.created_at,
+          status: a.status
+        });
+      });
+      activities.sort((a, b) => new Date(b.time) - new Date(a.time));
+      setRecentActivities(activities.slice(0, 5));
 
       // ===== UPDATE STATS =====
-      setStatsData({
-        appointmentsToday: todayAppointments.length || 0,
-        activeConsultations: activeAppointments.length || 0,
-        prescriptionsIssued: prescriptionsCount || 0,
-        totalPatients: totalPatients || 0
-      });
-
-      setRecentPatients(recentPatientsData || []);
-      setUpcomingAppointments(upcomingAppts);
+      setStatsData(prev => ({
+        ...prev,
+        appointmentsToday: todayAppts.length || 0,
+        activeConsultations: activeAppts.length || 0,
+        prescriptionsIssued: doctorPrescriptions.length || 0,
+        totalAppointments: doctorAppointments.length || 0,
+        completedAppointments: completedAppts.length || 0,
+        cancelledAppointments: cancelledAppts.length || 0,
+        weeklyAppointments: weeklyAppts.length || 0,
+        monthlyAppointments: monthlyAppts.length || 0,
+        totalPrescriptions: doctorPrescriptions.length || 0,
+        satisfactionRate: 98
+      }));
 
     } catch (err) {
       console.error('❌ Error fetching doctor data:', err);
@@ -222,14 +331,33 @@ const DoctorDashboard = () => {
   useEffect(() => {
     if (user?.id) {
       fetchDoctorData();
+
+      const handleDataChange = () => {
+        fetchDoctorData();
+      };
+
+      window.addEventListener('appointmentAdded', handleDataChange);
+      window.addEventListener('appointmentUpdated', handleDataChange);
+      window.addEventListener('prescriptionAdded', handleDataChange);
+      window.addEventListener('patientAdded', handleDataChange);
+
+      return () => {
+        window.removeEventListener('appointmentAdded', handleDataChange);
+        window.removeEventListener('appointmentUpdated', handleDataChange);
+        window.removeEventListener('prescriptionAdded', handleDataChange);
+        window.removeEventListener('patientAdded', handleDataChange);
+      };
     }
   }, [user]);
 
   // ===== REFRESH DATA =====
   const refreshData = () => {
     fetchDoctorData();
+    setSuccessMsg('✅ Data refreshed successfully!');
+    setTimeout(() => setSuccessMsg(''), 3000);
   };
 
+  // ===== NAVIGATION =====
   const handleNavigate = (page) => {
     navigate(`/${page}`);
   };
@@ -251,6 +379,7 @@ const DoctorDashboard = () => {
     }
   };
 
+  // ===== TIME AGO =====
   const timeAgo = (timestamp) => {
     if (!timestamp) return 'Just now';
     const diff = Math.floor((new Date() - new Date(timestamp)) / 1000);
@@ -260,127 +389,146 @@ const DoctorDashboard = () => {
     return `${Math.floor(diff / 86400)} days ago`;
   };
 
-  const goBack = () => {
-    navigate(-1);
+  // ===== GET STATUS BADGE =====
+  const getStatusBadge = (status) => {
+    const colors = {
+      scheduled: { bg: '#FEF3C7', text: '#D97706', label: 'Scheduled', icon: '⏳' },
+      'checked-in': { bg: '#DBEAFE', text: '#2563EB', label: 'Checked In', icon: '✅' },
+      'in-progress': { bg: '#DCFCE7', text: '#16A34A', label: 'In Progress', icon: '🔄' },
+      completed: { bg: '#DCFCE7', text: '#16A34A', label: 'Completed', icon: '✅' },
+      cancelled: { bg: '#FEE2E2', text: '#DC2626', label: 'Cancelled', icon: '❌' },
+      'no-show': { bg: '#F3F4F6', text: '#6B7280', label: 'No Show', icon: '⛔' }
+    };
+    return colors[status] || colors.scheduled;
   };
 
-  const openPrescriptions = () => {
-    navigate('/prescriptions');
-  };
+  // ===== SUCCESS/ERROR STATE =====
+  const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
-  const openNewPrescription = () => {
-    navigate('/prescriptions/new');
-  };
-
-  const openVitalSigns = () => {
-    navigate('/vitals');
-  };
-
-  const openMyProfile = () => {
-    navigate('/my-profile');
-  };
-
-  const openSettings = () => {
-    navigate('/settings');
-  };
-
-  const openSupport = () => {
-    navigate('/support');
-  };
-
-  const openAppointments = () => {
-    navigate('/appointments');
-  };
-
-  const openPatients = () => {
-    navigate('/patients');
-  };
-
-  const openPatientProfile = (patientId) => {
-    navigate(`/patients/${patientId}`);
-  };
-
+  // ============================================================
+  // ===== STATS CARDS =====
+  // ============================================================
   const stats = [
     {
       icon: Calendar,
       value: statsData.appointmentsToday,
-      label: 'Appointments Today',
-      trend: 'Today\'s schedule',
-      up: true,
+      label: "Today's Appointments",
+      trend: `${statsData.appointmentsToday} today`,
+      up: statsData.appointmentsToday > 0,
       color: statusColors.primary,
-      onClick: openAppointments
+      onClick: () => navigate('/appointments')
     },
     {
       icon: HeartPulse,
       value: statsData.activeConsultations,
       label: 'Active Consultations',
-      trend: 'In-Progress',
-      up: true,
+      trend: `${statsData.activeConsultations} in-progress`,
+      up: statsData.activeConsultations > 0,
       color: statusColors.success,
-      onClick: openAppointments
+      onClick: () => navigate('/appointments')
     },
     {
       icon: FileText,
       value: statsData.prescriptionsIssued,
       label: 'Prescriptions Issued',
-      trend: 'Total prescriptions',
-      up: true,
+      trend: `Total: ${statsData.totalPrescriptions}`,
+      up: statsData.prescriptionsIssued > 0,
       color: statusColors.purple,
-      onClick: openPrescriptions
+      onClick: () => navigate('/prescriptions')
     },
     {
       icon: Users,
       value: statsData.totalPatients,
       label: 'Total Patients',
-      trend: 'Unique patients',
-      up: true,
+      trend: `${statsData.patientsToday} new today`,
+      up: statsData.totalPatients > 0,
       color: statusColors.warning,
-      onClick: openPatients
+      onClick: () => navigate('/patients')
+    },
+    {
+      icon: TrendingUp,
+      value: statsData.totalAppointments,
+      label: 'Total Appointments',
+      trend: `This week: ${statsData.weeklyAppointments}`,
+      up: statsData.totalAppointments > 0,
+      color: statusColors.pink,
+      onClick: () => navigate('/appointments')
+    },
+    {
+      icon: CheckCircle,
+      value: statsData.completedAppointments,
+      label: 'Completed',
+      trend: `${statsData.completedAppointments} done`,
+      up: statsData.completedAppointments > 0,
+      color: statusColors.teal,
+      onClick: () => navigate('/appointments')
     }
   ];
 
+  // ============================================================
+  // ===== QUICK ACTIONS =====
+  // ============================================================
   const quickActions = [
     {
       icon: Users,
       label: 'View Patients',
       color: statusColors.primary,
-      onClick: openPatients
+      onClick: () => navigate('/patients')
     },
     {
       icon: Calendar,
       label: 'My Schedule',
       color: statusColors.success,
-      onClick: openAppointments
+      onClick: () => navigate('/appointments')
     },
     {
       icon: Pill,
       label: 'Prescriptions',
       color: statusColors.purple,
-      onClick: openPrescriptions
+      onClick: () => navigate('/prescriptions')
     },
     {
       icon: HeartPulse,
       label: 'Vital Signs',
       color: statusColors.danger,
-      onClick: openVitalSigns
+      onClick: () => navigate('/vitals')
+    },
+    {
+      icon: Plus,
+      label: 'New Prescription',
+      color: statusColors.pink,
+      onClick: () => navigate('/prescriptions/new')
+    },
+    {
+      icon: ClipboardPlus,
+      label: 'Patient Visit',
+      color: statusColors.teal,
+      onClick: () => navigate('/appointments')
     }
   ];
 
+  // ============================================================
+  // ===== PROFILE ITEMS =====
+  // ============================================================
   const profileItems = [
-    { icon: UserCircle, label: 'My Profile', onClick: openMyProfile },
-    { icon: Settings, label: 'Settings', onClick: openSettings },
-    { icon: Pill, label: 'Prescriptions', onClick: openPrescriptions },
-    { icon: Calendar, label: 'My Schedule', onClick: openAppointments },
-    { icon: HelpCircle, label: 'Help & Support', onClick: openSupport },
+    { icon: UserCircle, label: 'My Profile', onClick: () => navigate('/my-profile') },
+    { icon: Settings, label: 'Settings', onClick: () => navigate('/settings') },
+    { icon: Pill, label: 'Prescriptions', onClick: () => navigate('/prescriptions') },
+    { icon: Calendar, label: 'My Schedule', onClick: () => navigate('/appointments') },
+    { icon: HelpCircle, label: 'Help & Support', onClick: () => navigate('/support') },
     { divider: true },
     { icon: LogOut, label: 'Sign Out', onClick: handleSignOut, danger: true }
   ];
 
+  // ============================================================
+  // ===== LOADING & ERROR STATES =====
+  // ============================================================
   if (loading || isLoading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', flexDirection: 'column', gap: '16px', background: 'var(--bg-primary)' }}>
         <Loader size={40} className="spinner" />
-        <p style={{ color: 'var(--text-secondary)' }}>Loading doctor data...</p>
+        <p style={{ color: 'var(--text-secondary)' }}>Loading doctor dashboard...</p>
       </div>
     );
   }
@@ -391,11 +539,29 @@ const DoctorDashboard = () => {
         <AlertCircle size={48} color="var(--danger-color)" />
         <h2 style={{ color: 'var(--text-primary)' }}>Error Loading Data</h2>
         <p style={{ color: 'var(--text-secondary)' }}>{error}</p>
-        <button onClick={fetchDoctorData} style={{ padding: '10px 24px', background: 'var(--primary-color)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Retry</button>
+        <button
+          onClick={refreshData}
+          style={{
+            padding: '10px 24px',
+            background: 'var(--primary-color)',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <RefreshCw size={16} /> Retry
+        </button>
       </div>
     );
   }
 
+  // ============================================================
+  // ===== MAIN RENDER =====
+  // ============================================================
   return (
     <div className="dashboard-layout">
       <Sidebar
@@ -416,38 +582,7 @@ const DoctorDashboard = () => {
             <button className="hamburger-btn" onClick={() => setSidebarOpen(!sidebarOpen)}>
               <Menu size={22} />
             </button>
-            <button
-              onClick={goBack}
-              className="back-btn"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 12px',
-                background: 'transparent',
-                border: '1px solid var(--border-color)',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '0.8rem',
-                fontFamily: 'var(--font-family)',
-                color: 'var(--text-secondary)',
-                transition: 'all 0.2s ease',
-                marginLeft: '4px'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'var(--hover-bg)';
-                e.currentTarget.style.color = 'var(--text-primary)';
-                e.currentTarget.style.borderColor = 'var(--primary-color)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'transparent';
-                e.currentTarget.style.color = 'var(--text-secondary)';
-                e.currentTarget.style.borderColor = 'var(--border-color)';
-              }}
-            >
-              <ArrowLeft size={16} /> <span>Back</span>
-            </button>
-            <h1 style={{ fontSize: '1.1rem', fontWeight: 600, marginLeft: '8px' }}>Doctor Dashboard</h1>
+            <h1 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Doctor Dashboard</h1>
             <form onSubmit={handleSearch} className="header-search-form">
               <Search size={18} className="search-icon" />
               <input
@@ -462,6 +597,132 @@ const DoctorDashboard = () => {
           <div className="header-right">
             <span className="header-date">{currentDate}</span>
             <span className="header-time">{currentTime}</span>
+
+            {/* Notification Bell */}
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-secondary)',
+                  padding: '4px',
+                  borderRadius: '6px',
+                  position: 'relative',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'var(--hover-bg)';
+                  e.currentTarget.style.color = 'var(--text-primary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.color = 'var(--text-secondary)';
+                }}
+              >
+                <Bell size={20} />
+                {notifications.filter(n => !n.read).length > 0 && (
+                  <span style={{
+                    position: 'absolute',
+                    top: '-2px',
+                    right: '-2px',
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    background: '#EF4444',
+                    border: '2px solid var(--card-bg)'
+                  }} />
+                )}
+              </button>
+
+              {showNotifications && (
+                <div style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 8px)',
+                  right: 0,
+                  minWidth: '280px',
+                  background: 'var(--card-bg)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '12px',
+                  boxShadow: 'var(--shadow-lg)',
+                  padding: '8px 0',
+                  zIndex: 1000,
+                  animation: 'slideDown 0.2s ease'
+                }}>
+                  <div style={{
+                    padding: '10px 14px',
+                    borderBottom: '1px solid var(--border-color)',
+                    fontWeight: 600,
+                    fontSize: '0.85rem',
+                    color: 'var(--text-primary)'
+                  }}>
+                    Notifications
+                  </div>
+                  {notifications.length > 0 ? (
+                    notifications.map((notif, index) => {
+                      const Icon = notif.icon;
+                      return (
+                        <div
+                          key={index}
+                          style={{
+                            padding: '8px 14px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            borderBottom: index < notifications.length - 1 ? '1px solid var(--border-color)' : 'none',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = 'var(--hover-bg)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'transparent';
+                          }}
+                        >
+                          <div style={{
+                            padding: '6px',
+                            borderRadius: '8px',
+                            background: `${notif.color}15`,
+                            color: notif.color,
+                            display: 'flex'
+                          }}>
+                            <Icon size={14} />
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>
+                              {notif.title}
+                            </div>
+                            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                              {notif.time}
+                            </div>
+                          </div>
+                          {!notif.read && (
+                            <div style={{
+                              width: '6px',
+                              height: '6px',
+                              borderRadius: '50%',
+                              background: '#EF4444'
+                            }} />
+                          )}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div style={{
+                      padding: '20px',
+                      textAlign: 'center',
+                      color: 'var(--text-muted)',
+                      fontSize: '0.85rem'
+                    }}>
+                      No notifications
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             <button
               onClick={refreshData}
               style={{
@@ -488,6 +749,7 @@ const DoctorDashboard = () => {
               <RefreshCw size={18} />
             </button>
 
+            {/* ===== PROFILE ===== */}
             <div className="header-profile" ref={dropdownRef} style={{ position: 'relative' }}>
               <div
                 className="profile-trigger"
@@ -529,8 +791,12 @@ const DoctorDashboard = () => {
                   {userInitial}
                 </div>
                 <div className="profile-info" style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
-                  <div className="profile-name" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>{userName}</div>
-                  <div className="profile-role" style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>{userRole}</div>
+                  <div className="profile-name" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    Dr. {userName}
+                  </div>
+                  <div className="profile-role" style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>
+                    {doctorSpecialization}
+                  </div>
                 </div>
                 <ChevronDown size={16} style={{
                   color: 'var(--text-muted)',
@@ -574,8 +840,15 @@ const DoctorDashboard = () => {
                         {userInitial}
                       </div>
                       <div>
-                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{userName}</div>
-                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{userEmail}</div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                          Dr. {userName}
+                        </div>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                          {doctorSpecialization}
+                        </div>
+                        <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)' }}>
+                          {userEmail}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -625,27 +898,115 @@ const DoctorDashboard = () => {
         </header>
 
         <div className="dashboard-content">
-          <div className="welcome-section" style={{
+          {/* ===== SUCCESS/ERROR MESSAGES ===== */}
+          {successMsg && (
+            <div style={{
+              padding: '10px 14px',
+              borderRadius: '8px',
+              marginBottom: '16px',
+              background: '#22C55E15',
+              border: '1px solid #22C55E30',
+              color: '#16A34A',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '0.85rem'
+            }}>
+              <CheckCircle size={18} />
+              {successMsg}
+            </div>
+          )}
+          {errorMsg && (
+            <div style={{
+              padding: '10px 14px',
+              borderRadius: '8px',
+              marginBottom: '16px',
+              background: '#EF444415',
+              border: '1px solid #EF444430',
+              color: '#EF4444',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '0.85rem'
+            }}>
+              <AlertCircle size={18} />
+              {errorMsg}
+            </div>
+          )}
+
+          {/* ===== DOCTOR PROFILE CARD ===== */}
+          <div style={{
             background: 'linear-gradient(135deg, var(--primary-color), #7C3AED)',
-            padding: '20px 24px',
+            padding: '24px',
             borderRadius: '16px',
             color: 'white',
-            marginBottom: '24px'
+            marginBottom: '24px',
+            position: 'relative',
+            overflow: 'hidden'
           }}>
-            <div className="welcome-text">
-              <h2 style={{ fontSize: '1.3rem', fontWeight: 600, marginBottom: '4px' }}>
-                Welcome back, Dr. {userName}! 👨‍⚕️
-              </h2>
-              <p style={{ opacity: 0.9, fontSize: '0.9rem' }}>
-                You're signed in as <strong>{userRole}</strong>. Here's your clinical summary.
-              </p>
+            <div style={{
+              position: 'absolute',
+              right: '-50px',
+              top: '-50px',
+              width: '200px',
+              height: '200px',
+              borderRadius: '50%',
+              background: 'rgba(255,255,255,0.05)'
+            }} />
+            <div style={{
+              position: 'absolute',
+              right: '50px',
+              bottom: '-80px',
+              width: '150px',
+              height: '150px',
+              borderRadius: '50%',
+              background: 'rgba(255,255,255,0.03)'
+            }} />
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', position: 'relative', zIndex: 1 }}>
+              <div style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                background: 'rgba(255,255,255,0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.8rem',
+                fontWeight: 700,
+                border: '3px solid rgba(255,255,255,0.3)'
+              }}>
+                {userInitial}
+              </div>
+              <div style={{ flex: 1 }}>
+                <h2 style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: '2px' }}>
+                  Dr. {userName} 👨‍⚕️
+                </h2>
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', opacity: 0.9, fontSize: '0.85rem' }}>
+                  <span><Stethoscope size={14} style={{ display: 'inline', marginRight: '4px' }} /> {doctorSpecialization}</span>
+                  <span><Building size={14} style={{ display: 'inline', marginRight: '4px' }} /> {doctorDepartment}</span>
+                  <span><Star size={14} style={{ display: 'inline', marginRight: '4px' }} /> {doctorExperience}</span>
+                  <span><Users size={14} style={{ display: 'inline', marginRight: '4px' }} /> {statsData.totalPatients} patients</span>
+                </div>
+              </div>
+              <div style={{
+                padding: '8px 16px',
+                background: 'rgba(255,255,255,0.15)',
+                borderRadius: '10px',
+                border: '1px solid rgba(255,255,255,0.2)',
+                textAlign: 'center'
+              }}>
+                <div style={{ fontSize: '0.6rem', opacity: 0.8 }}>Satisfaction</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>{statsData.satisfactionRate}%</div>
+              </div>
             </div>
           </div>
 
+          {/* ===== STATS GRID ===== */}
           <div className="stats-grid" style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-            gap: '16px',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+            gap: '14px',
             marginBottom: '24px'
           }}>
             {stats.map((stat, index) => {
@@ -657,7 +1018,7 @@ const DoctorDashboard = () => {
                   onClick={stat.onClick}
                   style={{
                     cursor: 'pointer',
-                    padding: '16px',
+                    padding: '14px 16px',
                     background: 'var(--card-bg)',
                     borderRadius: '12px',
                     border: '1px solid var(--border-color)',
@@ -674,36 +1035,42 @@ const DoctorDashboard = () => {
                     e.currentTarget.style.borderColor = 'var(--border-color)';
                   }}
                 >
-                  <div className="stat-card-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div className="stat-card-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                     <div className="stat-card-icon" style={{
                       backgroundColor: `${stat.color}15`,
                       color: stat.color,
-                      padding: '8px',
-                      borderRadius: '10px',
+                      padding: '6px',
+                      borderRadius: '8px',
                       display: 'flex'
                     }}>
-                      <Icon size={20} />
+                      <Icon size={18} />
                     </div>
-                    <ChevronRight size={16} style={{ color: 'var(--text-muted)' }} />
+                    <span className={`stat-trend ${stat.up ? 'up' : 'down'}`} style={{
+                      fontSize: '0.65rem',
+                      color: stat.up ? 'var(--success-color)' : 'var(--danger-color)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}>
+                      {stat.up ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                      {stat.trend}
+                    </span>
                   </div>
-                  <div className="stat-card-value" style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)' }}>{stat.value}</div>
-                  <div className="stat-card-label" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{stat.label}</div>
-                  <div className={`stat-card-trend ${stat.up ? 'up' : 'down'}`} style={{
-                    fontSize: '0.7rem',
-                    color: stat.up ? 'var(--success-color)' : 'var(--danger-color)',
-                    marginTop: '4px'
-                  }}>{stat.trend}</div>
+                  <div className="stat-card-value" style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--text-primary)' }}>{stat.value}</div>
+                  <div className="stat-card-label" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{stat.label}</div>
                 </div>
               );
             })}
           </div>
 
+          {/* ===== TWO COLUMN LAYOUT ===== */}
           <div className="dashboard-two-col" style={{
             display: 'grid',
             gridTemplateColumns: '1fr 1fr',
-            gap: '20px',
+            gap: '16px',
             marginBottom: '24px'
           }}>
+            {/* ===== RECENT PATIENTS ===== */}
             <div className="activity-card" style={{
               background: 'var(--card-bg)',
               borderRadius: '12px',
@@ -712,14 +1079,17 @@ const DoctorDashboard = () => {
             }}>
               <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <div>
-                  <h3 className="card-title" style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>Recent Patients</h3>
-                  <p className="card-subtitle" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Latest patient registrations.</p>
+                  <h3 className="card-title" style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    <User size={16} style={{ display: 'inline', marginRight: '6px', color: 'var(--primary-color)' }} />
+                    Recent Patients
+                  </h3>
+                  <p className="card-subtitle" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Latest patient registrations</p>
                 </div>
                 <span
                   className="view-all-link"
-                  onClick={openPatients}
+                  onClick={() => navigate('/patients')}
                   style={{
-                    fontSize: '0.75rem',
+                    fontSize: '0.7rem',
                     color: 'var(--primary-color)',
                     cursor: 'pointer',
                     fontWeight: 500,
@@ -744,7 +1114,7 @@ const DoctorDashboard = () => {
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '12px',
+                      gap: '10px',
                       padding: '8px 0',
                       borderBottom: '1px solid var(--border-color)',
                       transition: 'all 0.2s ease'
@@ -759,31 +1129,32 @@ const DoctorDashboard = () => {
                       e.currentTarget.style.paddingLeft = '0';
                       e.currentTarget.style.borderRadius = '0';
                     }}
-                    onClick={() => openPatientProfile(patient.id)}
+                    onClick={() => navigate(`/patients/${patient.id}`)}
                   >
                     <div className="activity-dot" style={{
                       backgroundColor: statusColors.primary,
-                      width: '8px',
-                      height: '8px',
+                      width: '6px',
+                      height: '6px',
                       borderRadius: '50%',
                       flexShrink: 0
                     }} />
                     <div className="activity-content" style={{ flex: 1 }}>
-                      <p className="activity-text" style={{ fontSize: '0.85rem', color: 'var(--text-primary)', margin: 0 }}>
+                      <p className="activity-text" style={{ fontSize: '0.8rem', color: 'var(--text-primary)', margin: 0 }}>
                         <strong>{patient.name}</strong>
                       </p>
-                      <div className="activity-time" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                      <div className="activity-time" style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
                         {patient.phone || 'No phone'} • {timeAgo(patient.created_at)}
                       </div>
                     </div>
-                    <Eye size={16} style={{ color: 'var(--text-muted)' }} />
+                    <Eye size={14} style={{ color: 'var(--text-muted)' }} />
                   </div>
                 ))
               ) : (
-                <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px 0' }}>No recent patients</p>
+                <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px 0', fontSize: '0.85rem' }}>No recent patients</p>
               )}
             </div>
 
+            {/* ===== UPCOMING APPOINTMENTS ===== */}
             <div className="quick-actions-card" style={{
               background: 'var(--card-bg)',
               borderRadius: '12px',
@@ -792,14 +1163,17 @@ const DoctorDashboard = () => {
             }}>
               <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <div>
-                  <h3 className="card-title" style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>Upcoming Appointments</h3>
-                  <p className="card-subtitle" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Your next patient visits.</p>
+                  <h3 className="card-title" style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    <Calendar size={16} style={{ display: 'inline', marginRight: '6px', color: 'var(--warning-color)' }} />
+                    Upcoming Appointments
+                  </h3>
+                  <p className="card-subtitle" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Your next patient visits</p>
                 </div>
                 <span
                   className="view-all-link"
-                  onClick={openAppointments}
+                  onClick={() => navigate('/appointments')}
                   style={{
-                    fontSize: '0.75rem',
+                    fontSize: '0.7rem',
                     color: 'var(--primary-color)',
                     cursor: 'pointer',
                     fontWeight: 500,
@@ -816,77 +1190,82 @@ const DoctorDashboard = () => {
                 </span>
               </div>
               {upcomingAppointments.length > 0 ? (
-                upcomingAppointments.map((appt) => (
-                  <div
-                    key={appt.id}
-                    className="activity-item"
-                    style={{
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                      padding: '8px 0',
-                      borderBottom: '1px solid var(--border-color)',
-                      transition: 'all 0.2s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'var(--hover-bg)';
-                      e.currentTarget.style.paddingLeft = '4px';
-                      e.currentTarget.style.borderRadius = '4px';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent';
-                      e.currentTarget.style.paddingLeft = '0';
-                      e.currentTarget.style.borderRadius = '0';
-                    }}
-                    onClick={openAppointments}
-                  >
-                    <div className="activity-dot" style={{
-                      backgroundColor: appt.status === 'scheduled' ? statusColors.success :
-                        appt.status === 'in-progress' ? statusColors.warning :
-                          appt.status === 'completed' ? statusColors.primary :
-                            statusColors.danger,
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      flexShrink: 0
-                    }} />
-                    <div className="activity-content" style={{ flex: 1 }}>
-                      <p className="activity-text" style={{ fontSize: '0.85rem', color: 'var(--text-primary)', margin: 0 }}>
-                        <strong>{appt.patients?.name || 'Unknown Patient'}</strong>
-                      </p>
-                      <div className="activity-time" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                        {appt.appointment_date} • {appt.time_slot} •
-                        <span style={{
-                          color: appt.status === 'scheduled' ? 'var(--success-color)' :
-                            appt.status === 'in-progress' ? 'var(--warning-color)' :
-                              appt.status === 'completed' ? 'var(--primary-color)' :
-                                'var(--danger-color)',
-                          marginLeft: '4px',
-                          fontWeight: 500
-                        }}>
-                          {appt.status}
-                        </span>
+                upcomingAppointments.map((appt) => {
+                  const status = getStatusBadge(appt.status);
+                  return (
+                    <div
+                      key={appt.id}
+                      className="activity-item"
+                      style={{
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        padding: '8px 0',
+                        borderBottom: '1px solid var(--border-color)',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'var(--hover-bg)';
+                        e.currentTarget.style.paddingLeft = '4px';
+                        e.currentTarget.style.borderRadius = '4px';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.paddingLeft = '0';
+                        e.currentTarget.style.borderRadius = '0';
+                      }}
+                      onClick={() => navigate('/appointments')}
+                    >
+                      <div className="activity-dot" style={{
+                        backgroundColor: appt.status === 'scheduled' ? statusColors.success :
+                          appt.status === 'in-progress' ? statusColors.warning :
+                            appt.status === 'completed' ? statusColors.primary :
+                              statusColors.danger,
+                        width: '6px',
+                        height: '6px',
+                        borderRadius: '50%',
+                        flexShrink: 0
+                      }} />
+                      <div className="activity-content" style={{ flex: 1 }}>
+                        <p className="activity-text" style={{ fontSize: '0.8rem', color: 'var(--text-primary)', margin: 0 }}>
+                          <strong>{appt.patients?.name || 'Unknown Patient'}</strong>
+                        </p>
+                        <div className="activity-time" style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                          <span>{appt.appointment_date}</span>
+                          <span>•</span>
+                          <span>{appt.appointment_time || '09:00'}</span>
+                          <span style={{
+                            padding: '1px 6px',
+                            borderRadius: '8px',
+                            fontSize: '0.5rem',
+                            fontWeight: 600,
+                            background: status.bg,
+                            color: status.text
+                          }}>
+                            {status.icon} {status.label}
+                          </span>
+                        </div>
                       </div>
+                      <Clock size={14} style={{ color: 'var(--text-muted)' }} />
                     </div>
-                    <Clock size={16} style={{ color: 'var(--text-muted)' }} />
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                  <Calendar size={32} style={{ color: 'var(--text-muted)', marginBottom: '8px' }} />
-                  <p style={{ color: 'var(--text-muted)' }}>No upcoming appointments</p>
+                  <Calendar size={28} style={{ color: 'var(--text-muted)', marginBottom: '6px' }} />
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No upcoming appointments</p>
                   <button
                     onClick={() => navigate('/appointments')}
                     style={{
-                      marginTop: '8px',
-                      padding: '6px 16px',
+                      marginTop: '6px',
+                      padding: '6px 14px',
                       background: 'var(--primary-color)',
                       color: 'white',
                       border: 'none',
                       borderRadius: '6px',
                       cursor: 'pointer',
-                      fontSize: '0.75rem',
+                      fontSize: '0.7rem',
                       fontFamily: 'var(--font-family)',
                       transition: 'all 0.2s ease'
                     }}
@@ -904,12 +1283,16 @@ const DoctorDashboard = () => {
             </div>
           </div>
 
-          <div style={{ marginBottom: '24px' }}>
-            <h3 className="card-title" style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '12px' }}>Quick Actions</h3>
+          {/* ===== QUICK ACTIONS ===== */}
+          <div style={{ marginBottom: '20px' }}>
+            <h3 className="card-title" style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '10px' }}>
+              <Zap size={16} style={{ display: 'inline', marginRight: '6px', color: 'var(--primary-color)' }} />
+              Quick Actions
+            </h3>
             <div className="quick-actions-grid" style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-              gap: '12px'
+              gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+              gap: '10px'
             }}>
               {quickActions.map((action, index) => {
                 const Icon = action.icon;
@@ -922,14 +1305,14 @@ const DoctorDashboard = () => {
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '10px',
-                      padding: '12px 16px',
+                      gap: '8px',
+                      padding: '10px 14px',
                       background: 'var(--card-bg)',
                       border: '1px solid var(--border-color)',
                       borderRadius: '10px',
                       transition: 'all 0.3s ease',
                       fontFamily: 'var(--font-family)',
-                      fontSize: '0.8rem',
+                      fontSize: '0.75rem',
                       color: 'var(--text-primary)',
                       fontWeight: 500
                     }}
@@ -947,11 +1330,11 @@ const DoctorDashboard = () => {
                     <div className="quick-action-icon" style={{
                       backgroundColor: `${action.color}15`,
                       color: action.color,
-                      padding: '6px',
-                      borderRadius: '8px',
+                      padding: '4px',
+                      borderRadius: '6px',
                       display: 'flex'
                     }}>
-                      <Icon size={16} />
+                      <Icon size={14} />
                     </div>
                     {action.label}
                   </button>
@@ -960,61 +1343,91 @@ const DoctorDashboard = () => {
             </div>
           </div>
 
-          <div className="training-card" style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: '16px 20px',
-            background: 'var(--card-bg)',
-            borderRadius: '12px',
-            border: '1px solid var(--border-color)',
-            flexWrap: 'wrap',
-            gap: '12px'
-          }}>
-            <div className="training-card-content" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div className="training-icon" style={{
-                padding: '8px',
-                background: 'var(--primary-color)15',
-                borderRadius: '8px',
-                color: 'var(--primary-color)'
+          {/* ===== RECENT ACTIVITY ===== */}
+          {recentActivities.length > 0 && (
+            <div style={{
+              background: 'var(--card-bg)',
+              borderRadius: '12px',
+              border: '1px solid var(--border-color)',
+              padding: '16px'
+            }}>
+              <h3 style={{
+                fontSize: '0.9rem',
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+                marginBottom: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
               }}>
-                <BookOpen size={20} />
-              </div>
-              <div className="training-text" style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>
-                <strong>Need Training?</strong> Open the intern handbook for role onboarding.
-              </div>
+                <Clock size={16} style={{ color: 'var(--text-muted)' }} />
+                Recent Activity
+              </h3>
+              {recentActivities.map((activity, index) => (
+                <div
+                  key={index}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '6px 0',
+                    borderBottom: index < recentActivities.length - 1 ? '1px solid var(--border-color)' : 'none'
+                  }}
+                >
+                  <div style={{
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '6px',
+                    background: activity.type === 'patient' ? '#2563EB15' : '#8B5CF615',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: activity.type === 'patient' ? '#2563EB' : '#8B5CF6'
+                  }}>
+                    {activity.type === 'patient' ? <User size={12} /> : <Calendar size={12} />}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>
+                      {activity.title}
+                    </div>
+                    <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>
+                      {new Date(activity.time).toLocaleString()}
+                    </div>
+                  </div>
+                  {activity.status && (
+                    <span style={{
+                      padding: '1px 8px',
+                      borderRadius: '10px',
+                      fontSize: '0.5rem',
+                      fontWeight: 600,
+                      background: activity.status === 'registered' ? '#2563EB20' :
+                        activity.status === 'scheduled' ? '#F59E0B20' :
+                          activity.status === 'completed' ? '#22C55E20' :
+                            '#EF444420',
+                      color: activity.status === 'registered' ? '#2563EB' :
+                        activity.status === 'scheduled' ? '#F59E0B' :
+                          activity.status === 'completed' ? '#22C55E' :
+                            '#EF4444'
+                    }}>
+                      {activity.status}
+                    </span>
+                  )}
+                </div>
+              ))}
             </div>
-            <button
-              className="training-btn"
-              onClick={() => window.open('/handbook.pdf', '_blank')}
-              style={{
-                padding: '6px 16px',
-                background: 'var(--primary-color)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '0.75rem',
-                fontWeight: 500,
-                fontFamily: 'var(--font-family)',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#1D4ED8';
-                e.currentTarget.style.transform = 'scale(1.02)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'var(--primary-color)';
-                e.currentTarget.style.transform = 'scale(1)';
-              }}
-            >
-              Open Handbook →
-            </button>
-          </div>
+          )}
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
+        .spinner {
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+
         @keyframes slideDown {
           from {
             opacity: 0;
@@ -1046,17 +1459,11 @@ const DoctorDashboard = () => {
           .profile-info {
             display: none !important;
           }
-          .back-btn span {
-            display: none;
-          }
-          .back-btn {
-            padding: 6px 8px !important;
-          }
         }
 
         @media (max-width: 480px) {
           .stats-grid {
-            grid-template-columns: 1fr 1fr !important;
+            grid-template-columns: 1fr !important;
           }
           .quick-actions-grid {
             grid-template-columns: 1fr !important;

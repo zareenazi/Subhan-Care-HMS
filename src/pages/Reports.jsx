@@ -12,9 +12,1242 @@ import {
     Receipt, UserPlus, Sparkles, Award, Target,
     Grid, List, LayoutGrid, FileBarChart,
     ArrowLeft, CircleDot, CircleCheck, ArrowUp, ArrowDown,
-    HeartPulse, FileChartPie
+    HeartPulse, FileChartPie, Home, Briefcase, UserCircle, Calendar as CalendarIcon, UserCog, Pill as PillIcon,
+    LineChart, ChartNoAxesColumnIncreasing, ChartColumnStacked
 } from 'lucide-react';
 
+// ==================== TAB COMPONENTS ====================
+
+// 1. OVERVIEW TAB
+const OverviewTab = ({ stats, filteredInvoices, formatCurrency, getStatusBadgeClass }) => {
+    return (
+        <div>
+            {/* KPI CARDS */}
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(4, 1fr)',
+                gap: '16px',
+                marginBottom: '20px'
+            }}>
+                {[
+                    { icon: TrendingUp, label: 'Revenue', value: formatCurrency(stats.totalRevenue), change: `${stats.revenueChange >= 0 ? '+' : ''}${stats.revenueChange.toFixed(1)}%`, color: '#10B981', bg: '#DCFCE7' },
+                    { icon: AlertCircle, label: 'Pending', value: formatCurrency(stats.pendingRevenue), change: `${stats.pendingInvoices} inv`, color: '#EF4444', bg: '#FEE2E2' },
+                    { icon: Target, label: 'Collection', value: `${stats.collectionRate.toFixed(1)}%`, change: `Avg: ${formatCurrency(stats.averageInvoice)}`, color: '#3B82F6', bg: '#DBEAFE' },
+                    { icon: Award, label: 'Invoices', value: filteredInvoices.length, change: `${filteredInvoices.filter(inv => inv.status === 'paid').length} Paid`, color: '#8B5CF6', bg: '#EDE9FE' },
+                ].map((card, i) => (
+                    <div key={i} style={{
+                        background: 'var(--card-bg)',
+                        borderRadius: '12px',
+                        padding: '16px 18px',
+                        border: '1px solid var(--border-color)',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                        position: 'relative',
+                        overflow: 'hidden'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: '0.6rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                    {card.label}
+                                </div>
+                                <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
+                                    {card.value}
+                                </div>
+                                <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                                    <span style={{ color: stats.revenueChange >= 0 ? '#10B981' : '#EF4444', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '2px' }}>
+                                        {stats.revenueChange >= 0 ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
+                                        {card.change}
+                                    </span>
+                                </div>
+                            </div>
+                            <div style={{ padding: '8px', borderRadius: '10px', background: card.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <card.icon size={20} style={{ color: card.color }} />
+                            </div>
+                        </div>
+                        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '3px', background: `linear-gradient(90deg, ${card.color}, ${card.color}88)`, borderRadius: '0 0 12px 12px' }} />
+                    </div>
+                ))}
+            </div>
+
+            {/* SECONDARY METRICS */}
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(6, 1fr)',
+                gap: '12px',
+                marginBottom: '20px'
+            }}>
+                {[
+                    { icon: Calendar, label: 'Today', value: formatCurrency(stats.todayRevenue), color: '#10B981' },
+                    { icon: CalendarDays, label: 'Month', value: formatCurrency(stats.monthlyRevenue), color: '#3B82F6' },
+                    { icon: Clock, label: 'Week', value: formatCurrency(stats.weeklyRevenue), color: '#8B5CF6' },
+                    { icon: Users, label: 'Patients', value: stats.totalPatients, color: '#F59E0B' },
+                    { icon: Stethoscope, label: 'Doctors', value: stats.totalDoctors, color: '#EC4899' },
+                    { icon: Pill, label: 'Medicines', value: stats.totalMedicines, color: '#14B8A6' },
+                ].map((metric, i) => (
+                    <div key={i} style={{
+                        background: 'var(--card-bg)',
+                        borderRadius: '10px',
+                        padding: '12px 14px',
+                        border: '1px solid var(--border-color)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px'
+                    }}>
+                        <div style={{ padding: '6px', borderRadius: '8px', background: metric.color + '12', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <metric.icon size={16} style={{ color: metric.color }} />
+                        </div>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ fontSize: '0.5rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                                {metric.label}
+                            </div>
+                            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                {metric.value}
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* CHARTS */}
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '16px',
+                marginBottom: '20px'
+            }}>
+                <MonthlyChart stats={stats} formatCurrency={formatCurrency} />
+                <WeeklyChart stats={stats} formatCurrency={formatCurrency} />
+            </div>
+
+            {/* PAYMENT METHODS & STATUS */}
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '16px',
+                marginBottom: '20px'
+            }}>
+                <PaymentMethods stats={stats} formatCurrency={formatCurrency} />
+                <StatusBreakdown stats={stats} formatCurrency={formatCurrency} />
+            </div>
+
+            {/* TOP DOCTORS & SERVICES */}
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '16px',
+                marginBottom: '20px'
+            }}>
+                <TopDoctors stats={stats} formatCurrency={formatCurrency} />
+                <TopServices stats={stats} formatCurrency={formatCurrency} />
+            </div>
+        </div>
+    );
+};
+
+// Monthly Chart Component
+const MonthlyChart = ({ stats, formatCurrency }) => (
+    <div style={{
+        background: 'var(--card-bg)',
+        borderRadius: '12px',
+        padding: '16px',
+        border: '1px solid var(--border-color)'
+    }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <h3 style={{ fontWeight: 600, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <BarChart3 size={16} style={{ color: 'var(--primary-color)' }} /> Monthly Revenue
+            </h3>
+            <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>Last 12 Months</span>
+        </div>
+        <div style={{ height: '160px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', paddingBottom: '10px', borderBottom: '1px solid var(--border-color)' }}>
+            {stats.monthlyData && stats.monthlyData.length > 0 ? (
+                stats.monthlyData.map((data, index) => {
+                    const maxRevenue = Math.max(...stats.monthlyData.map(d => d.revenue), 1000);
+                    const heightPct = Math.max((data.revenue / maxRevenue) * 100, 5);
+                    return (
+                        <div key={index} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, gap: '4px' }}>
+                            <div style={{ fontSize: '0.45rem', fontWeight: 600, color: data.revenue > 0 ? 'var(--text-primary)' : 'var(--text-muted)', opacity: data.revenue > 0 ? 1 : 0.4 }}>
+                                {data.revenue > 0 ? formatCurrency(data.revenue).replace('Rs. ', '') : '0'}
+                            </div>
+                            <div style={{
+                                width: '60%',
+                                height: `${heightPct}px`,
+                                background: data.revenue > 0 ? `linear-gradient(to top, var(--primary-color), #60A5FA)` : '#E5E7EB',
+                                borderRadius: '4px 4px 0 0',
+                                transition: 'all 0.6s ease',
+                                minHeight: '3px'
+                            }} />
+                            <span style={{ fontSize: '0.5rem', color: 'var(--text-muted)', marginTop: '2px' }}>{data.month}</span>
+                        </div>
+                    );
+                })
+            ) : (
+                <div style={{ width: '100%', textAlign: 'center', color: 'var(--text-muted)', padding: '30px 0', fontSize: '0.7rem' }}>No data</div>
+            )}
+        </div>
+    </div>
+);
+
+// Weekly Chart Component
+const WeeklyChart = ({ stats, formatCurrency }) => (
+    <div style={{
+        background: 'var(--card-bg)',
+        borderRadius: '12px',
+        padding: '16px',
+        border: '1px solid var(--border-color)'
+    }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <h3 style={{ fontWeight: 600, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Activity size={16} style={{ color: '#8B5CF6' }} /> Weekly Revenue
+            </h3>
+            <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>Last 7 Days</span>
+        </div>
+        <div style={{ height: '160px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', paddingBottom: '10px', borderBottom: '1px solid var(--border-color)' }}>
+            {stats.weeklyData && stats.weeklyData.length > 0 ? (
+                stats.weeklyData.map((data, index) => {
+                    const maxRevenue = Math.max(...stats.weeklyData.map(d => d.revenue), 1000);
+                    const heightPct = Math.max((data.revenue / maxRevenue) * 100, 5);
+                    return (
+                        <div key={index} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, gap: '4px' }}>
+                            <div style={{ fontSize: '0.45rem', fontWeight: 600, color: data.revenue > 0 ? 'var(--text-primary)' : 'var(--text-muted)', opacity: data.revenue > 0 ? 1 : 0.4 }}>
+                                {data.revenue > 0 ? formatCurrency(data.revenue).replace('Rs. ', '') : '0'}
+                            </div>
+                            <div style={{
+                                width: '60%',
+                                height: `${heightPct}px`,
+                                background: data.revenue > 0 ? `linear-gradient(to top, #8B5CF6, #C084FC)` : '#E5E7EB',
+                                borderRadius: '4px 4px 0 0',
+                                transition: 'all 0.6s ease',
+                                minHeight: '3px'
+                            }} />
+                            <span style={{ fontSize: '0.5rem', color: 'var(--text-muted)', marginTop: '2px' }}>{data.date}</span>
+                        </div>
+                    );
+                })
+            ) : (
+                <div style={{ width: '100%', textAlign: 'center', color: 'var(--text-muted)', padding: '30px 0', fontSize: '0.7rem' }}>No data</div>
+            )}
+        </div>
+    </div>
+);
+
+// Payment Methods Component
+const PaymentMethods = ({ stats, formatCurrency }) => (
+    <div style={{
+        background: 'var(--card-bg)',
+        borderRadius: '12px',
+        padding: '16px',
+        border: '1px solid var(--border-color)'
+    }}>
+        <h3 style={{ fontWeight: 600, fontSize: '0.8rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <PieChart size={16} style={{ color: '#F59E0B' }} /> Payment Methods
+        </h3>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
+            {Object.entries(stats.paymentMethods).map(([key, data]) => {
+                const percentage = stats.totalRevenue > 0 ? (data.amount / stats.totalRevenue) * 100 : 0;
+                const colors = { cash: '#10B981', card: '#3B82F6', bankTransfer: '#8B5CF6', insurance: '#F59E0B', online: '#EC4899' };
+                const color = colors[key] || '#6B7280';
+                return (
+                    <div key={key} style={{ padding: '8px 12px', background: 'var(--bg-light)', borderRadius: '6px', borderLeft: `3px solid ${color}` }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ fontWeight: 600, fontSize: '0.65rem' }}>{key.charAt(0).toUpperCase() + key.slice(1)}</span>
+                            <span style={{ fontSize: '0.55rem', color: 'var(--text-muted)' }}>{data.count} transactions</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{formatCurrency(data.amount)}</span>
+                            <span style={{ fontSize: '0.55rem', color: 'var(--text-muted)' }}>{percentage.toFixed(0)}%</span>
+                        </div>
+                        <div style={{ width: '100%', height: '3px', background: 'var(--bg-dark)', borderRadius: '2px', marginTop: '4px', overflow: 'hidden' }}>
+                            <div style={{ width: `${percentage}%`, height: '100%', background: color, borderRadius: '2px', transition: 'width 0.6s ease' }} />
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    </div>
+);
+
+// Status Breakdown Component
+const StatusBreakdown = ({ stats, formatCurrency }) => (
+    <div style={{
+        background: 'var(--card-bg)',
+        borderRadius: '12px',
+        padding: '16px',
+        border: '1px solid var(--border-color)'
+    }}>
+        <h3 style={{ fontWeight: 600, fontSize: '0.8rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Activity size={16} style={{ color: '#3B82F6' }} /> Status Breakdown
+        </h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {stats.statusBreakdown.map((item, index) => (
+                <div key={index} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'var(--bg-light)', borderRadius: '6px', borderLeft: `3px solid ${item.color}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '0.8rem' }}>{item.icon}</span>
+                        <span style={{ fontWeight: 500, fontSize: '0.65rem' }}>{item.status}</span>
+                        <span style={{ fontSize: '0.55rem', color: 'var(--text-muted)' }}>({item.count})</span>
+                    </div>
+                    <div style={{ fontWeight: 600, fontSize: '0.7rem' }}>{item.amount > 0 ? formatCurrency(item.amount) : '—'}</div>
+                </div>
+            ))}
+        </div>
+    </div>
+);
+
+// Top Doctors Component
+const TopDoctors = ({ stats, formatCurrency }) => (
+    <div style={{
+        background: 'var(--card-bg)',
+        borderRadius: '12px',
+        padding: '16px',
+        border: '1px solid var(--border-color)'
+    }}>
+        <h3 style={{ fontWeight: 600, fontSize: '0.8rem', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Stethoscope size={16} style={{ color: '#EC4899' }} /> Top Doctors
+        </h3>
+        {stats.topDoctors && stats.topDoctors.length > 0 ? (
+            stats.topDoctors.slice(0, 5).map((doc, index) => (
+                <div key={index} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '6px 12px',
+                    background: index === 0 ? 'var(--primary-light)' : 'var(--bg-light)',
+                    borderRadius: '6px',
+                    marginBottom: '4px'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontWeight: 700, fontSize: '0.6rem', color: index === 0 ? 'var(--primary-color)' : 'var(--text-muted)' }}>#{index + 1}</span>
+                        <span style={{ fontWeight: 500, fontSize: '0.65rem' }}>{doc.name || 'Unknown Doctor'}</span>
+                    </div>
+                    <div style={{ fontWeight: 600, fontSize: '0.65rem' }}>{formatCurrency(doc.amount)}</div>
+                </div>
+            ))
+        ) : (
+            <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '0.7rem' }}>No doctor data available</div>
+        )}
+    </div>
+);
+
+// Top Services Component
+const TopServices = ({ stats, formatCurrency }) => (
+    <div style={{
+        background: 'var(--card-bg)',
+        borderRadius: '12px',
+        padding: '16px',
+        border: '1px solid var(--border-color)'
+    }}>
+        <h3 style={{ fontWeight: 600, fontSize: '0.8rem', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <HeartPulse size={16} style={{ color: '#14B8A6' }} /> Top Services
+        </h3>
+        {stats.topServices && stats.topServices.length > 0 ? (
+            stats.topServices.slice(0, 5).map((service, index) => (
+                <div key={index} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '6px 12px',
+                    background: index === 0 ? 'var(--primary-light)' : 'var(--bg-light)',
+                    borderRadius: '6px',
+                    marginBottom: '4px'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontWeight: 700, fontSize: '0.6rem', color: index === 0 ? 'var(--primary-color)' : 'var(--text-muted)' }}>#{index + 1}</span>
+                        <span style={{ fontWeight: 500, fontSize: '0.65rem' }}>{service.name || 'Unknown'}</span>
+                    </div>
+                    <div style={{ fontWeight: 600, fontSize: '0.65rem' }}>{formatCurrency(service.amount)}</div>
+                </div>
+            ))
+        ) : (
+            <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '0.7rem' }}>No service data available</div>
+        )}
+    </div>
+);
+
+// ==================== FINANCIAL TAB ====================
+const FinancialTab = ({ stats, filteredInvoices, formatCurrency, getStatusBadgeClass, handleExportTab }) => {
+    return (
+        <div>
+            <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                marginBottom: '16px', flexWrap: 'wrap', gap: '8px'
+            }}>
+                <h3 style={{ fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <DollarSign size={18} style={{ color: '#10B981' }} /> Financial Overview
+                </h3>
+                <button onClick={() => handleExportTab('financial')}
+                    style={{
+                        display: 'flex', alignItems: 'center', gap: '6px',
+                        padding: '6px 14px', borderRadius: '8px',
+                        border: 'none', background: 'var(--primary-color)',
+                        color: 'white', cursor: 'pointer', fontSize: '0.6rem',
+                        fontWeight: 600
+                    }}>
+                    <Download size={14} /> Export
+                </button>
+            </div>
+
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(4, 1fr)',
+                gap: '16px',
+                marginBottom: '20px'
+            }}>
+                {[
+                    { label: 'Total Revenue', value: formatCurrency(stats.totalRevenue), icon: '💰', color: '#10B981', bg: '#DCFCE7' },
+                    { label: 'Pending Revenue', value: formatCurrency(stats.pendingRevenue), icon: '⏳', color: '#EF4444', bg: '#FEE2E2' },
+                    { label: 'Collection Rate', value: `${stats.collectionRate.toFixed(1)}%`, icon: '📊', color: '#3B82F6', bg: '#DBEAFE' },
+                    { label: 'Avg Invoice', value: formatCurrency(stats.averageInvoice), icon: '📋', color: '#8B5CF6', bg: '#EDE9FE' },
+                ].map((item, i) => (
+                    <div key={i} style={{
+                        background: 'var(--card-bg)',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        border: '1px solid var(--border-color)',
+                        borderLeft: `4px solid ${item.color}`
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ padding: '8px', borderRadius: '10px', background: item.bg }}>
+                                <span style={{ fontSize: '1.2rem' }}>{item.icon}</span>
+                            </div>
+                            <div>
+                                <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{item.label}</div>
+                                <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{item.value}</div>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Financial Graphs */}
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '16px',
+                marginBottom: '20px'
+            }}>
+                <MonthlyChart stats={stats} formatCurrency={formatCurrency} />
+                <WeeklyChart stats={stats} formatCurrency={formatCurrency} />
+            </div>
+
+            {/* Payment Methods Detail */}
+            <div style={{
+                background: 'var(--card-bg)',
+                borderRadius: '12px',
+                padding: '16px',
+                border: '1px solid var(--border-color)',
+                marginBottom: '16px'
+            }}>
+                <h3 style={{ fontWeight: 600, fontSize: '0.8rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <CreditCard size={16} style={{ color: '#3B82F6' }} /> Payment Methods Detail
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px' }}>
+                    {Object.entries(stats.paymentMethods).map(([key, data]) => {
+                        const colors = { cash: '#10B981', card: '#3B82F6', bankTransfer: '#8B5CF6', insurance: '#F59E0B', online: '#EC4899' };
+                        const color = colors[key] || '#6B7280';
+                        return (
+                            <div key={key} style={{ padding: '10px 12px', background: 'var(--bg-light)', borderRadius: '8px', textAlign: 'center' }}>
+                                <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{key}</div>
+                                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: color, marginTop: '4px' }}>{formatCurrency(data.amount)}</div>
+                                <div style={{ fontSize: '0.5rem', color: 'var(--text-muted)', marginTop: '2px' }}>{data.count} transactions</div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* Monthly Revenue Table */}
+            <div style={{
+                background: 'var(--card-bg)',
+                borderRadius: '12px',
+                padding: '16px',
+                border: '1px solid var(--border-color)'
+            }}>
+                <h3 style={{ fontWeight: 600, fontSize: '0.8rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <BarChart3 size={16} style={{ color: '#F59E0B' }} /> Monthly Breakdown
+                </h3>
+                <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.6rem', minWidth: '400px' }}>
+                        <thead>
+                            <tr style={{ background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>
+                                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>Month</th>
+                                <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--text-secondary)' }}>Revenue</th>
+                                <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, color: 'var(--text-secondary)' }}>Invoices</th>
+                                <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, color: 'var(--text-secondary)' }}>Paid</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {stats.monthlyData && stats.monthlyData.length > 0 ? (
+                                stats.monthlyData.map((data, index) => (
+                                    <tr key={index} style={{ borderBottom: index < stats.monthlyData.length - 1 ? '1px solid var(--border-color)' : 'none' }}>
+                                        <td style={{ padding: '8px 12px', fontWeight: 500 }}>{data.month}</td>
+                                        <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600 }}>{formatCurrency(data.revenue)}</td>
+                                        <td style={{ padding: '8px 12px', textAlign: 'center' }}>{data.count}</td>
+                                        <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                                            <span className={`hms-badge ${data.paid === data.count ? 'success' : 'warning'}`}>
+                                                {data.paid}/{data.count}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr><td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>No data</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ==================== PATIENTS TAB ====================
+const PatientsTab = ({ stats, patients, formatCurrency, handleExportTab }) => {
+    return (
+        <div>
+            <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                marginBottom: '16px', flexWrap: 'wrap', gap: '8px'
+            }}>
+                <h3 style={{ fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Users size={18} style={{ color: '#3B82F6' }} /> Patient Analytics
+                </h3>
+                <button onClick={() => handleExportTab('patients')}
+                    style={{
+                        display: 'flex', alignItems: 'center', gap: '6px',
+                        padding: '6px 14px', borderRadius: '8px',
+                        border: 'none', background: 'var(--primary-color)',
+                        color: 'white', cursor: 'pointer', fontSize: '0.6rem',
+                        fontWeight: 600
+                    }}>
+                    <Download size={14} /> Export
+                </button>
+            </div>
+
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(4, 1fr)',
+                gap: '16px',
+                marginBottom: '20px'
+            }}>
+                {[
+                    { label: 'Total Patients', value: stats.totalPatients, icon: '👤', color: '#3B82F6', bg: '#DBEAFE' },
+                    { label: 'New Patients', value: stats.newPatients, icon: '✨', color: '#10B981', bg: '#DCFCE7' },
+                    { label: 'Active Patients', value: stats.activePatients, icon: '🟢', color: '#F59E0B', bg: '#FEF3C7' },
+                    { label: 'Gender', value: `👨 ${stats.malePatients} | 👩 ${stats.femalePatients}`, icon: '👥', color: '#8B5CF6', bg: '#EDE9FE' },
+                ].map((item, i) => (
+                    <div key={i} style={{
+                        background: 'var(--card-bg)',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        border: '1px solid var(--border-color)',
+                        borderLeft: `4px solid ${item.color}`
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ padding: '8px', borderRadius: '10px', background: item.bg }}>
+                                <span style={{ fontSize: '1.2rem' }}>{item.icon}</span>
+                            </div>
+                            <div>
+                                <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{item.label}</div>
+                                <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{item.value}</div>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Patients Graph */}
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '16px',
+                marginBottom: '20px'
+            }}>
+                <div style={{
+                    background: 'var(--card-bg)',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    border: '1px solid var(--border-color)'
+                }}>
+                    <h3 style={{ fontWeight: 600, fontSize: '0.8rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Users size={16} style={{ color: '#3B82F6' }} /> Patient Growth
+                    </h3>
+                    <div style={{ height: '160px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', paddingBottom: '10px', borderBottom: '1px solid var(--border-color)' }}>
+                        {stats.monthlyData && stats.monthlyData.length > 0 ? (
+                            stats.monthlyData.slice(-6).map((data, index) => {
+                                const maxCount = Math.max(...stats.monthlyData.slice(-6).map(d => d.count), 1);
+                                const heightPct = Math.max((data.count / maxCount) * 100, 5);
+                                return (
+                                    <div key={index} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, gap: '4px' }}>
+                                        <div style={{ fontSize: '0.45rem', fontWeight: 600, color: data.count > 0 ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                                            {data.count}
+                                        </div>
+                                        <div style={{
+                                            width: '60%',
+                                            height: `${heightPct}px`,
+                                            background: data.count > 0 ? `linear-gradient(to top, #3B82F6, #60A5FA)` : '#E5E7EB',
+                                            borderRadius: '4px 4px 0 0',
+                                            transition: 'all 0.6s ease',
+                                            minHeight: '3px'
+                                        }} />
+                                        <span style={{ fontSize: '0.5rem', color: 'var(--text-muted)', marginTop: '2px' }}>{data.month}</span>
+                                    </div>
+                                );
+                            })
+                        ) : (
+                            <div style={{ width: '100%', textAlign: 'center', color: 'var(--text-muted)', padding: '30px 0', fontSize: '0.7rem' }}>No data</div>
+                        )}
+                    </div>
+                </div>
+
+                <div style={{
+                    background: 'var(--card-bg)',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    border: '1px solid var(--border-color)'
+                }}>
+                    <h3 style={{ fontWeight: 600, fontSize: '0.8rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <PieChart size={16} style={{ color: '#8B5CF6' }} /> Gender Distribution
+                    </h3>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '160px', gap: '40px' }}>
+                        <div style={{ textAlign: 'center' }}>
+                            <div style={{ fontSize: '2rem' }}>👨</div>
+                            <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#3B82F6' }}>{stats.malePatients}</div>
+                            <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>Male</div>
+                            <div style={{ width: '60px', height: '6px', background: '#3B82F6', borderRadius: '4px', margin: '4px auto' }} />
+                        </div>
+                        <div style={{ textAlign: 'center' }}>
+                            <div style={{ fontSize: '2rem' }}>👩</div>
+                            <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#EC4899' }}>{stats.femalePatients}</div>
+                            <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>Female</div>
+                            <div style={{ width: '60px', height: '6px', background: '#EC4899', borderRadius: '4px', margin: '4px auto' }} />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Recent Patients */}
+            <div style={{
+                background: 'var(--card-bg)',
+                borderRadius: '12px',
+                padding: '16px',
+                border: '1px solid var(--border-color)'
+            }}>
+                <h3 style={{ fontWeight: 600, fontSize: '0.8rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <UserPlus size={16} style={{ color: '#3B82F6' }} /> Recent Patients
+                </h3>
+                <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.6rem', minWidth: '350px' }}>
+                        <thead>
+                            <tr style={{ background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>
+                                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>Name</th>
+                                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>Phone</th>
+                                <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--text-secondary)' }}>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {stats.recentPatients && stats.recentPatients.length > 0 ? (
+                                stats.recentPatients.map((patient, index) => (
+                                    <tr key={index} style={{ borderBottom: index < stats.recentPatients.length - 1 ? '1px solid var(--border-color)' : 'none' }}>
+                                        <td style={{ padding: '8px 12px', fontWeight: 500 }}>{patient.name}</td>
+                                        <td style={{ padding: '8px 12px' }}>{patient.phone || 'N/A'}</td>
+                                        <td style={{ padding: '8px 12px', textAlign: 'right' }}>{new Date(patient.created_at).toLocaleDateString()}</td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr><td colSpan="3" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>No recent patients</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ==================== APPOINTMENTS TAB ====================
+const AppointmentsTab = ({ stats, formatCurrency, handleExportTab }) => {
+    return (
+        <div>
+            <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                marginBottom: '16px', flexWrap: 'wrap', gap: '8px'
+            }}>
+                <h3 style={{ fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Calendar size={18} style={{ color: '#F59E0B' }} /> Appointment Analytics
+                </h3>
+                <button onClick={() => handleExportTab('appointments')}
+                    style={{
+                        display: 'flex', alignItems: 'center', gap: '6px',
+                        padding: '6px 14px', borderRadius: '8px',
+                        border: 'none', background: 'var(--primary-color)',
+                        color: 'white', cursor: 'pointer', fontSize: '0.6rem',
+                        fontWeight: 600
+                    }}>
+                    <Download size={14} /> Export
+                </button>
+            </div>
+
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(4, 1fr)',
+                gap: '16px',
+                marginBottom: '20px'
+            }}>
+                {[
+                    { label: 'Total Appointments', value: stats.totalAppointments, icon: '📋', color: '#3B82F6', bg: '#DBEAFE' },
+                    { label: 'Completed', value: stats.completedAppointments, icon: '✅', color: '#10B981', bg: '#DCFCE7' },
+                    { label: 'Upcoming', value: stats.upcomingAppointments, icon: '📅', color: '#F59E0B', bg: '#FEF3C7' },
+                    { label: 'Cancelled', value: stats.cancelledAppointments, icon: '❌', color: '#EF4444', bg: '#FEE2E2' },
+                ].map((item, i) => (
+                    <div key={i} style={{
+                        background: 'var(--card-bg)',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        border: '1px solid var(--border-color)',
+                        borderLeft: `4px solid ${item.color}`
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ padding: '8px', borderRadius: '10px', background: item.bg }}>
+                                <span style={{ fontSize: '1.2rem' }}>{item.icon}</span>
+                            </div>
+                            <div>
+                                <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{item.label}</div>
+                                <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{item.value}</div>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Appointments Graph */}
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '16px',
+                marginBottom: '20px'
+            }}>
+                <div style={{
+                    background: 'var(--card-bg)',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    border: '1px solid var(--border-color)'
+                }}>
+                    <h3 style={{ fontWeight: 600, fontSize: '0.8rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <BarChart3 size={16} style={{ color: '#F59E0B' }} /> Weekly Appointments
+                    </h3>
+                    <div style={{ height: '160px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', paddingBottom: '10px', borderBottom: '1px solid var(--border-color)' }}>
+                        {stats.weeklyData && stats.weeklyData.length > 0 ? (
+                            stats.weeklyData.map((data, index) => {
+                                const maxCount = Math.max(...stats.weeklyData.map(d => d.count), 1);
+                                const heightPct = Math.max((data.count / maxCount) * 100, 5);
+                                return (
+                                    <div key={index} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, gap: '4px' }}>
+                                        <div style={{ fontSize: '0.45rem', fontWeight: 600, color: data.count > 0 ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                                            {data.count}
+                                        </div>
+                                        <div style={{
+                                            width: '60%',
+                                            height: `${heightPct}px`,
+                                            background: data.count > 0 ? `linear-gradient(to top, #F59E0B, #FBBF24)` : '#E5E7EB',
+                                            borderRadius: '4px 4px 0 0',
+                                            transition: 'all 0.6s ease',
+                                            minHeight: '3px'
+                                        }} />
+                                        <span style={{ fontSize: '0.5rem', color: 'var(--text-muted)', marginTop: '2px' }}>{data.date}</span>
+                                    </div>
+                                );
+                            })
+                        ) : (
+                            <div style={{ width: '100%', textAlign: 'center', color: 'var(--text-muted)', padding: '30px 0', fontSize: '0.7rem' }}>No data</div>
+                        )}
+                    </div>
+                </div>
+
+                <div style={{
+                    background: 'var(--card-bg)',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    border: '1px solid var(--border-color)'
+                }}>
+                    <h3 style={{ fontWeight: 600, fontSize: '0.8rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <PieChart size={16} style={{ color: '#8B5CF6' }} /> Appointment Status
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '10px' }}>
+                        <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem' }}>
+                                <span>Completed</span>
+                                <span style={{ fontWeight: 600 }}>{stats.completedAppointments}</span>
+                            </div>
+                            <div style={{ width: '100%', height: '6px', background: 'var(--bg-dark)', borderRadius: '4px', overflow: 'hidden', marginTop: '2px' }}>
+                                <div style={{ width: `${stats.totalAppointments > 0 ? (stats.completedAppointments / stats.totalAppointments) * 100 : 0}%`, height: '100%', background: '#10B981', borderRadius: '4px' }} />
+                            </div>
+                        </div>
+                        <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem' }}>
+                                <span>Upcoming</span>
+                                <span style={{ fontWeight: 600 }}>{stats.upcomingAppointments}</span>
+                            </div>
+                            <div style={{ width: '100%', height: '6px', background: 'var(--bg-dark)', borderRadius: '4px', overflow: 'hidden', marginTop: '2px' }}>
+                                <div style={{ width: `${stats.totalAppointments > 0 ? (stats.upcomingAppointments / stats.totalAppointments) * 100 : 0}%`, height: '100%', background: '#F59E0B', borderRadius: '4px' }} />
+                            </div>
+                        </div>
+                        <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem' }}>
+                                <span>Cancelled</span>
+                                <span style={{ fontWeight: 600 }}>{stats.cancelledAppointments}</span>
+                            </div>
+                            <div style={{ width: '100%', height: '6px', background: 'var(--bg-dark)', borderRadius: '4px', overflow: 'hidden', marginTop: '2px' }}>
+                                <div style={{ width: `${stats.totalAppointments > 0 ? (stats.cancelledAppointments / stats.totalAppointments) * 100 : 0}%`, height: '100%', background: '#EF4444', borderRadius: '4px' }} />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div style={{
+                background: 'var(--card-bg)',
+                borderRadius: '12px',
+                padding: '16px',
+                border: '1px solid var(--border-color)',
+                marginBottom: '16px'
+            }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Completion Rate</span>
+                    <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--primary-color)' }}>
+                        {stats.totalAppointments > 0 ? ((stats.completedAppointments / stats.totalAppointments) * 100).toFixed(1) : 0}%
+                    </span>
+                </div>
+                <div style={{ width: '100%', height: '8px', background: 'var(--bg-dark)', borderRadius: '4px', marginTop: '6px', overflow: 'hidden' }}>
+                    <div style={{
+                        width: `${stats.totalAppointments > 0 ? (stats.completedAppointments / stats.totalAppointments) * 100 : 0}%`,
+                        height: '100%',
+                        background: 'linear-gradient(90deg, #3B82F6, #10B981)',
+                        borderRadius: '4px',
+                        transition: 'width 0.6s ease'
+                    }} />
+                </div>
+            </div>
+
+            {/* Upcoming Appointments */}
+            <div style={{
+                background: 'var(--card-bg)',
+                borderRadius: '12px',
+                padding: '16px',
+                border: '1px solid var(--border-color)'
+            }}>
+                <h3 style={{ fontWeight: 600, fontSize: '0.8rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <CalendarIcon size={16} style={{ color: '#F59E0B' }} /> Upcoming Appointments
+                </h3>
+                <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.6rem', minWidth: '350px' }}>
+                        <thead>
+                            <tr style={{ background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>
+                                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>Patient</th>
+                                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>Doctor</th>
+                                <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--text-secondary)' }}>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {stats.upcomingAppointmentsList && stats.upcomingAppointmentsList.length > 0 ? (
+                                stats.upcomingAppointmentsList.map((appt, index) => (
+                                    <tr key={index} style={{ borderBottom: index < stats.upcomingAppointmentsList.length - 1 ? '1px solid var(--border-color)' : 'none' }}>
+                                        <td style={{ padding: '8px 12px', fontWeight: 500 }}>{appt.patient_name}</td>
+                                        <td style={{ padding: '8px 12px' }}>{appt.doctor_name}</td>
+                                        <td style={{ padding: '8px 12px', textAlign: 'right' }}>{appt.date} {appt.time}</td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr><td colSpan="3" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>No upcoming appointments</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ==================== DOCTORS TAB ====================
+const DoctorsTab = ({ stats, formatCurrency, handleExportTab }) => {
+    return (
+        <div>
+            <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                marginBottom: '16px', flexWrap: 'wrap', gap: '8px'
+            }}>
+                <h3 style={{ fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Stethoscope size={18} style={{ color: '#EC4899' }} /> Doctor Analytics
+                </h3>
+                <button onClick={() => handleExportTab('doctors')}
+                    style={{
+                        display: 'flex', alignItems: 'center', gap: '6px',
+                        padding: '6px 14px', borderRadius: '8px',
+                        border: 'none', background: 'var(--primary-color)',
+                        color: 'white', cursor: 'pointer', fontSize: '0.6rem',
+                        fontWeight: 600
+                    }}>
+                    <Download size={14} /> Export
+                </button>
+            </div>
+
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, 1fr)',
+                gap: '16px',
+                marginBottom: '20px'
+            }}>
+                {[
+                    { label: 'Total Doctors', value: stats.totalDoctors, icon: '🩺', color: '#EC4899', bg: '#FCE7F3' },
+                    { label: 'Top Revenue', value: stats.revenueByDoctor && stats.revenueByDoctor.length > 0 ? formatCurrency(stats.revenueByDoctor[0]?.amount || 0) : 'Rs. 0', icon: '🏆', color: '#F59E0B', bg: '#FEF3C7' },
+                ].map((item, i) => (
+                    <div key={i} style={{
+                        background: 'var(--card-bg)',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        border: '1px solid var(--border-color)',
+                        borderLeft: `4px solid ${item.color}`
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ padding: '8px', borderRadius: '10px', background: item.bg }}>
+                                <span style={{ fontSize: '1.2rem' }}>{item.icon}</span>
+                            </div>
+                            <div>
+                                <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{item.label}</div>
+                                <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{item.value}</div>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Doctors Graph */}
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '16px',
+                marginBottom: '20px'
+            }}>
+                <div style={{
+                    background: 'var(--card-bg)',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    border: '1px solid var(--border-color)'
+                }}>
+                    <h3 style={{ fontWeight: 600, fontSize: '0.8rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <BarChart3 size={16} style={{ color: '#EC4899' }} /> Doctor Revenue
+                    </h3>
+                    <div style={{ height: '160px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', paddingBottom: '10px', borderBottom: '1px solid var(--border-color)' }}>
+                        {stats.revenueByDoctor && stats.revenueByDoctor.length > 0 ? (
+                            stats.revenueByDoctor.slice(0, 6).map((doc, index) => {
+                                const maxRevenue = Math.max(...stats.revenueByDoctor.map(d => d.amount), 1000);
+                                const heightPct = Math.max((doc.amount / maxRevenue) * 100, 5);
+                                return (
+                                    <div key={index} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, gap: '4px' }}>
+                                        <div style={{ fontSize: '0.4rem', fontWeight: 600, color: doc.amount > 0 ? 'var(--text-primary)' : 'var(--text-muted)', textAlign: 'center' }}>
+                                            {doc.amount > 0 ? formatCurrency(doc.amount).replace('Rs. ', '') : '0'}
+                                        </div>
+                                        <div style={{
+                                            width: '50%',
+                                            height: `${heightPct}px`,
+                                            background: doc.amount > 0 ? `linear-gradient(to top, #EC4899, #F472B6)` : '#E5E7EB',
+                                            borderRadius: '4px 4px 0 0',
+                                            transition: 'all 0.6s ease',
+                                            minHeight: '3px'
+                                        }} />
+                                        <span style={{ fontSize: '0.4rem', color: 'var(--text-muted)', marginTop: '2px', textAlign: 'center', maxWidth: '50px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.name || 'Unknown'}</span>
+                                    </div>
+                                );
+                            })
+                        ) : (
+                            <div style={{ width: '100%', textAlign: 'center', color: 'var(--text-muted)', padding: '30px 0', fontSize: '0.7rem' }}>No doctor data available</div>
+                        )}
+                    </div>
+                </div>
+
+                <div style={{
+                    background: 'var(--card-bg)',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    border: '1px solid var(--border-color)'
+                }}>
+                    <h3 style={{ fontWeight: 600, fontSize: '0.8rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <PieChart size={16} style={{ color: '#F59E0B' }} /> Doctor Performance
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '10px' }}>
+                        {stats.revenueByDoctor && stats.revenueByDoctor.slice(0, 4).map((doc, index) => {
+                            const total = stats.revenueByDoctor.reduce((sum, d) => sum + d.amount, 0) || 1;
+                            const percentage = (doc.amount / total) * 100;
+                            return (
+                                <div key={index}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem' }}>
+                                        <span>{doc.name || 'Unknown'}</span>
+                                        <span style={{ fontWeight: 600 }}>{formatCurrency(doc.amount)}</span>
+                                    </div>
+                                    <div style={{ width: '100%', height: '6px', background: 'var(--bg-dark)', borderRadius: '4px', overflow: 'hidden', marginTop: '2px' }}>
+                                        <div style={{
+                                            width: `${percentage}%`,
+                                            height: '100%',
+                                            background: `hsl(${index * 45 + 200}, 70%, 50%)`,
+                                            borderRadius: '4px'
+                                        }} />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+
+            {/* Doctor Rankings */}
+            <div style={{
+                background: 'var(--card-bg)',
+                borderRadius: '12px',
+                padding: '16px',
+                border: '1px solid var(--border-color)'
+            }}>
+                <h3 style={{ fontWeight: 600, fontSize: '0.8rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <UserCog size={16} style={{ color: '#EC4899' }} /> Doctor Revenue Rankings
+                </h3>
+                <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.6rem', minWidth: '350px' }}>
+                        <thead>
+                            <tr style={{ background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>
+                                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>#</th>
+                                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>Doctor</th>
+                                <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, color: 'var(--text-secondary)' }}>Invoices</th>
+                                <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--text-secondary)' }}>Revenue</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {stats.revenueByDoctor && stats.revenueByDoctor.length > 0 ? (
+                                stats.revenueByDoctor.map((doc, index) => (
+                                    <tr key={index} style={{
+                                        borderBottom: index < stats.revenueByDoctor.length - 1 ? '1px solid var(--border-color)' : 'none',
+                                        background: index === 0 ? 'var(--primary-light)' : 'transparent'
+                                    }}>
+                                        <td style={{ padding: '8px 12px', fontWeight: 700, color: index === 0 ? 'var(--primary-color)' : 'var(--text-muted)' }}>
+                                            {index === 0 ? '🏆' : `#${index + 1}`}
+                                        </td>
+                                        <td style={{ padding: '8px 12px', fontWeight: 500 }}>{doc.name || 'Unknown Doctor'}</td>
+                                        <td style={{ padding: '8px 12px', textAlign: 'center' }}>{doc.count || 0}</td>
+                                        <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600 }}>{formatCurrency(doc.amount || 0)}</td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr><td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>No doctor data available</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ==================== PHARMACY TAB ====================
+const PharmacyTab = ({ stats, medicines, formatCurrency, handleExportTab }) => {
+    return (
+        <div>
+            <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                marginBottom: '16px', flexWrap: 'wrap', gap: '8px'
+            }}>
+                <h3 style={{ fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Pill size={18} style={{ color: '#14B8A6' }} /> Pharmacy Analytics
+                </h3>
+                <button onClick={() => handleExportTab('pharmacy')}
+                    style={{
+                        display: 'flex', alignItems: 'center', gap: '6px',
+                        padding: '6px 14px', borderRadius: '8px',
+                        border: 'none', background: 'var(--primary-color)',
+                        color: 'white', cursor: 'pointer', fontSize: '0.6rem',
+                        fontWeight: 600
+                    }}>
+                    <Download size={14} /> Export
+                </button>
+            </div>
+
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(4, 1fr)',
+                gap: '16px',
+                marginBottom: '20px'
+            }}>
+                {[
+                    { label: 'Total Medicines', value: stats.totalMedicines, icon: '💊', color: '#14B8A6', bg: '#DCFCE7' },
+                    { label: 'Low Stock', value: stats.lowStockMedicines, icon: '⚠️', color: '#F59E0B', bg: '#FEF3C7' },
+                    { label: 'Out of Stock', value: stats.outOfStockMedicines, icon: '🚫', color: '#EF4444', bg: '#FEE2E2' },
+                    { label: 'Inventory Value', value: formatCurrency(stats.totalInventoryValue), icon: '💰', color: '#8B5CF6', bg: '#EDE9FE' },
+                ].map((item, i) => (
+                    <div key={i} style={{
+                        background: 'var(--card-bg)',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        border: '1px solid var(--border-color)',
+                        borderLeft: `4px solid ${item.color}`
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ padding: '8px', borderRadius: '10px', background: item.bg }}>
+                                <span style={{ fontSize: '1.2rem' }}>{item.icon}</span>
+                            </div>
+                            <div>
+                                <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{item.label}</div>
+                                <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{item.value}</div>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Pharmacy Graphs */}
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '16px',
+                marginBottom: '20px'
+            }}>
+                <div style={{
+                    background: 'var(--card-bg)',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    border: '1px solid var(--border-color)'
+                }}>
+                    <h3 style={{ fontWeight: 600, fontSize: '0.8rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Package size={16} style={{ color: '#14B8A6' }} /> Stock Status
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '10px' }}>
+                        <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem' }}>
+                                <span>✅ In Stock</span>
+                                <span style={{ fontWeight: 600 }}>{stats.totalMedicines - stats.outOfStockMedicines}</span>
+                            </div>
+                            <div style={{ width: '100%', height: '6px', background: 'var(--bg-dark)', borderRadius: '4px', overflow: 'hidden', marginTop: '2px' }}>
+                                <div style={{
+                                    width: `${stats.totalMedicines > 0 ? ((stats.totalMedicines - stats.outOfStockMedicines) / stats.totalMedicines) * 100 : 0}%`,
+                                    height: '100%',
+                                    background: '#10B981',
+                                    borderRadius: '4px'
+                                }} />
+                            </div>
+                        </div>
+                        <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem' }}>
+                                <span>⚠️ Low Stock (&lt;20)</span>
+                                <span style={{ fontWeight: 600 }}>{stats.lowStockMedicines}</span>
+                            </div>
+                            <div style={{ width: '100%', height: '6px', background: 'var(--bg-dark)', borderRadius: '4px', overflow: 'hidden', marginTop: '2px' }}>
+                                <div style={{
+                                    width: `${stats.totalMedicines > 0 ? (stats.lowStockMedicines / stats.totalMedicines) * 100 : 0}%`,
+                                    height: '100%',
+                                    background: '#F59E0B',
+                                    borderRadius: '4px'
+                                }} />
+                            </div>
+                        </div>
+                        <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem' }}>
+                                <span>🚫 Out of Stock</span>
+                                <span style={{ fontWeight: 600 }}>{stats.outOfStockMedicines}</span>
+                            </div>
+                            <div style={{ width: '100%', height: '6px', background: 'var(--bg-dark)', borderRadius: '4px', overflow: 'hidden', marginTop: '2px' }}>
+                                <div style={{
+                                    width: `${stats.totalMedicines > 0 ? (stats.outOfStockMedicines / stats.totalMedicines) * 100 : 0}%`,
+                                    height: '100%',
+                                    background: '#EF4444',
+                                    borderRadius: '4px'
+                                }} />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style={{
+                    background: 'var(--card-bg)',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    border: '1px solid var(--border-color)'
+                }}>
+                    <h3 style={{ fontWeight: 600, fontSize: '0.8rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <BarChart3 size={16} style={{ color: '#8B5CF6' }} /> Top Medicines by Value
+                    </h3>
+                    <div style={{ height: '160px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', paddingBottom: '10px', borderBottom: '1px solid var(--border-color)' }}>
+                        {medicines && medicines.length > 0 ? (
+                            medicines
+                                .slice(0, 6)
+                                .sort((a, b) => (parseFloat(b.selling_price || b.price || 0) * parseInt(b.stock || 0)) - (parseFloat(a.selling_price || a.price || 0) * parseInt(a.stock || 0)))
+                                .map((med, index) => {
+                                    const value = (parseFloat(med.selling_price || med.price || 0) * parseInt(med.stock || 0));
+                                    const maxValue = Math.max(...medicines.slice(0, 6).map(m => (parseFloat(m.selling_price || m.price || 0) * parseInt(m.stock || 0))), 1000);
+                                    const heightPct = Math.max((value / maxValue) * 100, 5);
+                                    return (
+                                        <div key={index} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, gap: '4px' }}>
+                                            <div style={{ fontSize: '0.4rem', fontWeight: 600, color: value > 0 ? 'var(--text-primary)' : 'var(--text-muted)', textAlign: 'center' }}>
+                                                {value > 0 ? formatCurrency(value).replace('Rs. ', '') : '0'}
+                                            </div>
+                                            <div style={{
+                                                width: '50%',
+                                                height: `${heightPct}px`,
+                                                background: value > 0 ? `linear-gradient(to top, #8B5CF6, #C084FC)` : '#E5E7EB',
+                                                borderRadius: '4px 4px 0 0',
+                                                transition: 'all 0.6s ease',
+                                                minHeight: '3px'
+                                            }} />
+                                            <span style={{ fontSize: '0.4rem', color: 'var(--text-muted)', marginTop: '2px', textAlign: 'center', maxWidth: '50px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {med.medicine_name || med.name || 'Unknown'}
+                                            </span>
+                                        </div>
+                                    );
+                                })
+                        ) : (
+                            <div style={{ width: '100%', textAlign: 'center', color: 'var(--text-muted)', padding: '30px 0', fontSize: '0.7rem' }}>No medicines found</div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* Medicine List - FIXED: Using medicine_name instead of name */}
+            <div style={{
+                background: 'var(--card-bg)',
+                borderRadius: '12px',
+                padding: '16px',
+                border: '1px solid var(--border-color)'
+            }}>
+                <h3 style={{ fontWeight: 600, fontSize: '0.8rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Package size={16} style={{ color: '#14B8A6' }} /> Medicine Inventory
+                </h3>
+                <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.6rem', minWidth: '450px' }}>
+                        <thead>
+                            <tr style={{ background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>
+                                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>Medicine Name</th>
+                                <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--text-secondary)' }}>Price</th>
+                                <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, color: 'var(--text-secondary)' }}>Stock</th>
+                                <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--text-secondary)' }}>Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {medicines && medicines.length > 0 ? (
+                                medicines.slice(0, 15).map((med, index) => {
+                                    const stock = parseInt(med.stock) || 0;
+                                    const price = parseFloat(med.selling_price || med.price || 0);
+                                    const status = stock === 0 ? 'danger' : stock <= 20 ? 'warning' : 'success';
+                                    return (
+                                        <tr key={index} style={{ borderBottom: index < Math.min(medicines.length, 15) - 1 ? '1px solid var(--border-color)' : 'none' }}>
+                                            <td style={{ padding: '8px 12px', fontWeight: 500 }}>{med.medicine_name || med.name || 'Unknown Medicine'}</td>
+                                            <td style={{ padding: '8px 12px', textAlign: 'right' }}>{formatCurrency(price)}</td>
+                                            <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                                                <span className={`hms-badge ${status}`}>{stock}</span>
+                                            </td>
+                                            <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600 }}>{formatCurrency(stock * price)}</td>
+                                        </tr>
+                                    );
+                                })
+                            ) : (
+                                <tr><td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>No medicines found</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ==================== MAIN COMPONENT ====================
 const Reports = () => {
     // ==================== STATE MANAGEMENT ====================
     const [invoices, setInvoices] = useState([]);
@@ -25,6 +1258,7 @@ const Reports = () => {
     const [loading, setLoading] = useState(false);
     const [exporting, setExporting] = useState(false);
     const [showExportMenu, setShowExportMenu] = useState(false);
+    const [activeTab, setActiveTab] = useState('overview');
     const [dateRange, setDateRange] = useState({
         start: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
         end: new Date().toISOString().split('T')[0]
@@ -124,13 +1358,28 @@ const Reports = () => {
 
             if (apptError) throw apptError;
 
+            // ===== FIXED: LOAD DOCTORS DATA =====
             const { data: docData, error: docError } = await supabase
                 .from('doctors')
-                .select('*');
+                .select('id, name, specialization, department');
 
-            if (docError) throw docError;
+            if (docError) {
+                console.error('❌ Doctors Error:', docError);
+                setDoctors([]);
+            } else {
+                console.log('✅ Doctors loaded:', docData?.length || 0);
+                setDoctors(docData || []);
+            }
 
-            const pharmacyData = await dbPharmacy.getPharmacy();
+            // ===== FIXED: LOAD PHARMACY DATA =====
+            let pharmacyData = [];
+            try {
+                pharmacyData = await dbPharmacy.getPharmacy();
+                console.log('✅ Pharmacy Data loaded:', pharmacyData?.length || 0);
+            } catch (pharmErr) {
+                console.error('❌ Pharmacy Error:', pharmErr);
+                pharmacyData = [];
+            }
             setMedicines(pharmacyData || []);
 
             const patientIds = invData?.map(inv => inv.patient_id).filter(id => id) || [];
@@ -158,7 +1407,6 @@ const Reports = () => {
             setFilteredInvoices(mergedInvoices);
             setPatients(patData || []);
             setAppointments(apptData || []);
-            setDoctors(docData || []);
             calculateStats(mergedInvoices, patData || [], apptData || [], docData || [], pharmacyData || []);
         } catch (err) {
             console.error('❌ Load report error:', err);
@@ -235,28 +1483,45 @@ const Reports = () => {
             });
         }
 
+        // ===== FIXED: Calculate doctor revenue =====
         const doctorRevenue = {};
+        (docData || []).forEach(doc => {
+            doctorRevenue[doc.id] = {
+                id: doc.id,
+                name: doc.name || 'Unknown Doctor',
+                count: 0,
+                amount: 0
+            };
+        });
+
         invData.forEach(inv => {
-            if (inv.doctor_id) {
-                const doc = docData.find(d => d.id === inv.doctor_id);
-                const docName = doc?.name || 'Unknown';
-                if (!doctorRevenue[docName]) doctorRevenue[docName] = { count: 0, amount: 0 };
-                doctorRevenue[docName].count++;
-                doctorRevenue[docName].amount += parseFloat(inv.total) || 0;
+            if (inv.doctor_id && doctorRevenue[inv.doctor_id]) {
+                doctorRevenue[inv.doctor_id].count++;
+                doctorRevenue[inv.doctor_id].amount += parseFloat(inv.total) || 0;
             }
         });
-        const topDoctors = Object.entries(doctorRevenue).sort((a, b) => b[1].amount - a[1].amount).slice(0, 5).map(([name, data]) => ({ name, ...data }));
+
+        const revenueByDoctor = Object.values(doctorRevenue)
+            .filter(d => d.count > 0 || d.amount > 0)
+            .sort((a, b) => b.amount - a.amount);
+
+        console.log('✅ Revenue by Doctor:', revenueByDoctor);
+        setStats(prev => ({ ...prev, revenueByDoctor }));
+
+        const topDoctors = revenueByDoctor.slice(0, 5);
 
         const serviceCount = {};
         invData.forEach(inv => {
             if (inv.items) {
                 const items = typeof inv.items === 'string' ? JSON.parse(inv.items) : inv.items;
-                items.forEach(item => {
-                    const name = item.medicine_name || item.name || 'Other';
-                    if (!serviceCount[name]) serviceCount[name] = { count: 0, amount: 0 };
-                    serviceCount[name].count++;
-                    serviceCount[name].amount += parseFloat(item.total || item.price || 0);
-                });
+                if (Array.isArray(items)) {
+                    items.forEach(item => {
+                        const name = item.medicine_name || item.name || 'Other';
+                        if (!serviceCount[name]) serviceCount[name] = { count: 0, amount: 0 };
+                        serviceCount[name].count++;
+                        serviceCount[name].amount += parseFloat(item.total || item.price || 0);
+                    });
+                }
             }
         });
         const topServices = Object.entries(serviceCount).sort((a, b) => b[1].amount - a[1].amount).slice(0, 5).map(([name, data]) => ({ name, ...data }));
@@ -294,11 +1559,9 @@ const Reports = () => {
                 id: a.id,
                 patient_name: a.patient_name || 'Unknown',
                 doctor_name: a.doctor_name || 'Unknown',
-                date: a.date,
-                time: a.time
+                date: a.date || a.appointment_date,
+                time: a.time || a.appointment_time
             }));
-
-        const revenueByDoctor = Object.entries(doctorRevenue).map(([name, data]) => ({ name, ...data })).sort((a, b) => b.amount - a.amount);
 
         const departmentRevenue = {};
         invData.forEach(inv => {
@@ -327,8 +1590,8 @@ const Reports = () => {
             cancelledAppointments: apptData.filter(a => a.status === 'cancelled').length,
             upcomingAppointments: apptData.filter(a => a.status === 'scheduled' || a.status === 'pending').length,
             totalDoctors: docData.length, totalMedicines: pharmacyData.length,
-            lowStockMedicines: pharmacyData.filter(m => m.stock > 0 && m.stock <= 20).length,
-            outOfStockMedicines: pharmacyData.filter(m => m.stock === 0 || !m.stock).length,
+            lowStockMedicines: pharmacyData.filter(m => (parseInt(m.stock) || 0) > 0 && parseInt(m.stock) <= 20).length,
+            outOfStockMedicines: pharmacyData.filter(m => parseInt(m.stock) === 0 || !m.stock).length,
             totalInventoryValue: pharmacyData.reduce((sum, m) => sum + (parseFloat(m.selling_price || m.price || 0) * parseInt(m.stock || 0)), 0),
             paymentMethods, monthlyData, weeklyData, topDoctors, topServices, topPatients,
             topMedicines: pharmacyData.slice(0, 5), recentTransactions, recentPatients, upcomingAppointmentsList,
@@ -377,6 +1640,109 @@ const Reports = () => {
         setShowFilterPopup(false);
         calculateStats(invoices, patients, appointments, doctors, medicines);
         showToast('✅ Filters cleared!', 'success');
+    };
+
+    // ==================== EXPORT TAB DATA ====================
+    const handleExportTab = (tabName) => {
+        setExporting(true);
+        try {
+            let dataToExport = [];
+            let fileName = `report_${tabName}_${new Date().toISOString().split('T')[0]}`;
+            let headers = [];
+            let rows = [];
+
+            switch (tabName) {
+                case 'financial':
+                    dataToExport = filteredInvoices.length > 0 ? filteredInvoices : invoices;
+                    headers = ['Invoice #', 'Patient', 'Amount', 'Status', 'Date', 'Payment Method', 'Department'];
+                    rows = dataToExport.map(inv => [
+                        inv.invoice_number || '',
+                        inv.patient?.name || inv.patient_name || 'N/A',
+                        inv.total || 0,
+                        inv.status || 'pending',
+                        new Date(inv.created_at).toLocaleDateString() || '',
+                        inv.payment_method || 'N/A',
+                        inv.department || 'General'
+                    ]);
+                    break;
+
+                case 'patients':
+                    dataToExport = patients || [];
+                    headers = ['Name', 'Phone', 'Gender', 'Age', 'Status', 'Registered'];
+                    rows = dataToExport.map(p => [
+                        p.name || 'N/A',
+                        p.phone || 'N/A',
+                        p.gender || 'N/A',
+                        p.age || 'N/A',
+                        p.status || 'active',
+                        new Date(p.created_at).toLocaleDateString() || ''
+                    ]);
+                    break;
+
+                case 'appointments':
+                    dataToExport = appointments || [];
+                    headers = ['Patient', 'Doctor', 'Date', 'Time', 'Status'];
+                    rows = dataToExport.map(a => [
+                        a.patient_name || 'N/A',
+                        a.doctor_name || 'N/A',
+                        a.date || a.appointment_date || 'N/A',
+                        a.time || a.appointment_time || 'N/A',
+                        a.status || 'pending'
+                    ]);
+                    break;
+
+                case 'doctors':
+                    dataToExport = stats.revenueByDoctor || [];
+                    headers = ['Doctor Name', 'Invoices', 'Revenue'];
+                    rows = dataToExport.map(d => [
+                        d.name || 'Unknown',
+                        d.count || 0,
+                        d.amount || 0
+                    ]);
+                    break;
+
+                case 'pharmacy':
+                    dataToExport = medicines || [];
+                    headers = ['Medicine Name', 'Price', 'Stock', 'Value'];
+                    rows = dataToExport.map(m => [
+                        m.medicine_name || m.name || 'Unknown',
+                        m.selling_price || m.price || 0,
+                        m.stock || 0,
+                        (parseFloat(m.selling_price || m.price || 0) * parseInt(m.stock || 0)) || 0
+                    ]);
+                    break;
+
+                default:
+                    dataToExport = filteredInvoices.length > 0 ? filteredInvoices : invoices;
+                    headers = ['Invoice #', 'Patient', 'Amount', 'Status', 'Date', 'Payment Method', 'Department'];
+                    rows = dataToExport.map(inv => [
+                        inv.invoice_number || '',
+                        inv.patient?.name || inv.patient_name || 'N/A',
+                        inv.total || 0,
+                        inv.status || 'pending',
+                        new Date(inv.created_at).toLocaleDateString() || '',
+                        inv.payment_method || 'N/A',
+                        inv.department || 'General'
+                    ]);
+            }
+
+            const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${fileName}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            showToast(`✅ ${tabName.charAt(0).toUpperCase() + tabName.slice(1)} report exported!`, 'success');
+        } catch (err) {
+            console.error('Export error:', err);
+            showToast('Export failed: ' + err.message, 'error');
+        } finally {
+            setExporting(false);
+        }
     };
 
     // ==================== GENERATE REPORT ====================
@@ -660,7 +2026,37 @@ const Reports = () => {
         return count;
     };
 
-    // ==================== RENDER ====================
+    // ==================== TABS CONFIGURATION ====================
+    const tabs = [
+        { id: 'overview', label: 'Overview', icon: <Home size={16} /> },
+        { id: 'financial', label: 'Financial', icon: <DollarSign size={16} /> },
+        { id: 'patients', label: 'Patients', icon: <Users size={16} /> },
+        { id: 'appointments', label: 'Appointments', icon: <Calendar size={16} /> },
+        { id: 'doctors', label: 'Doctors', icon: <Stethoscope size={16} /> },
+        { id: 'pharmacy', label: 'Pharmacy', icon: <Pill size={16} /> }
+    ];
+
+    // ==================== RENDER TAB CONTENT ====================
+    const renderTabContent = () => {
+        switch (activeTab) {
+            case 'overview':
+                return <OverviewTab stats={stats} filteredInvoices={filteredInvoices} formatCurrency={formatCurrency} getStatusBadgeClass={getStatusBadgeClass} />;
+            case 'financial':
+                return <FinancialTab stats={stats} filteredInvoices={filteredInvoices} formatCurrency={formatCurrency} getStatusBadgeClass={getStatusBadgeClass} handleExportTab={handleExportTab} />;
+            case 'patients':
+                return <PatientsTab stats={stats} patients={patients} formatCurrency={formatCurrency} handleExportTab={handleExportTab} />;
+            case 'appointments':
+                return <AppointmentsTab stats={stats} formatCurrency={formatCurrency} handleExportTab={handleExportTab} />;
+            case 'doctors':
+                return <DoctorsTab stats={stats} formatCurrency={formatCurrency} handleExportTab={handleExportTab} />;
+            case 'pharmacy':
+                return <PharmacyTab stats={stats} medicines={medicines} formatCurrency={formatCurrency} handleExportTab={handleExportTab} />;
+            default:
+                return <OverviewTab stats={stats} filteredInvoices={filteredInvoices} formatCurrency={formatCurrency} getStatusBadgeClass={getStatusBadgeClass} />;
+        }
+    };
+
+    // ==================== MAIN RENDER ====================
     return (
         <DashboardLayout active="reports" title="Reports & Financial Statements">
             {/* Toast */}
@@ -693,155 +2089,151 @@ const Reports = () => {
             ) : (
                 <div>
 
-                    {/* ===== HERO HEADER - MOBILE FRIENDLY ===== */}
+                    {/* ===== HERO HEADER ===== */}
                     <div style={{
                         background: 'linear-gradient(135deg, #1E40AF, #3B82F6, #60A5FA)',
                         borderRadius: '16px',
-                        padding: '16px 20px',
-                        marginBottom: '16px',
+                        padding: '20px 24px',
+                        marginBottom: '20px',
                         color: 'white',
                         position: 'relative',
                         overflow: 'hidden',
                         boxShadow: '0 10px 40px rgba(59, 130, 246, 0.3)'
                     }}>
                         <div style={{ position: 'absolute', top: '-50%', right: '-5%', width: '300px', height: '300px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', position: 'relative', zIndex: 1 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', position: 'relative', zIndex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                                 <button
                                     onClick={handleBack}
                                     style={{
-                                        display: 'flex', alignItems: 'center', gap: '4px',
-                                        padding: '6px 10px',
-                                        borderRadius: '8px',
+                                        display: 'flex', alignItems: 'center', gap: '6px',
+                                        padding: '8px 14px',
+                                        borderRadius: '10px',
                                         background: 'rgba(255,255,255,0.15)',
                                         border: '1px solid rgba(255,255,255,0.2)',
                                         color: 'white',
                                         cursor: 'pointer',
-                                        fontSize: '0.65rem',
+                                        fontSize: '0.7rem',
                                         backdropFilter: 'blur(8px)',
                                         transition: 'all 0.3s ease'
                                     }}
                                     onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.25)'; }}
                                     onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.15)'; }}
                                 >
-                                    <ArrowLeft size={14} /> Back
+                                    <ArrowLeft size={16} /> Back
                                 </button>
                                 <div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                                        <Sparkles size={16} />
-                                        <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>Analytics</h2>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                                        <Sparkles size={20} />
+                                        <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>Analytics Dashboard</h2>
                                         <span style={{
-                                            padding: '1px 8px',
+                                            padding: '2px 10px',
                                             borderRadius: '12px',
                                             background: 'rgba(255,255,255,0.15)',
-                                            fontSize: '0.45rem',
+                                            fontSize: '0.5rem',
                                             fontWeight: 600,
                                             textTransform: 'uppercase'
                                         }}>Live</span>
                                     </div>
-                                    <p style={{ opacity: 0.8, fontSize: '0.55rem', margin: 0 }}>
+                                    <p style={{ opacity: 0.8, fontSize: '0.6rem', margin: 0 }}>
                                         {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
                                     </p>
                                 </div>
                             </div>
-                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                                 <button
                                     onClick={generateReport}
                                     disabled={generatingReport}
                                     style={{
-                                        display: 'flex', alignItems: 'center', gap: '4px',
-                                        padding: '6px 12px', borderRadius: '8px',
+                                        display: 'flex', alignItems: 'center', gap: '6px',
+                                        padding: '8px 16px', borderRadius: '10px',
                                         background: 'rgba(255,255,255,0.15)',
                                         border: '1px solid rgba(255,255,255,0.2)',
                                         color: 'white', cursor: 'pointer',
-                                        fontSize: '0.6rem', backdropFilter: 'blur(8px)',
+                                        fontSize: '0.65rem', backdropFilter: 'blur(8px)',
                                         transition: 'all 0.3s ease',
                                         opacity: generatingReport ? 0.6 : 1
-                                    }}
-                                >
+                                    }}>
                                     {generatingReport ? (
-                                        <Loader size={12} className="spinning" />
+                                        <Loader size={14} className="spinning" />
                                     ) : (
-                                        <FileBarChart size={12} />
+                                        <FileBarChart size={14} />
                                     )}
-                                    {generatingReport ? 'Gen' : 'Report'}
+                                    {generatingReport ? 'Generating...' : 'Generate Report'}
                                 </button>
                                 <button onClick={loadReportData} style={{
-                                    display: 'flex', alignItems: 'center', gap: '4px',
-                                    padding: '6px 10px', borderRadius: '8px',
+                                    display: 'flex', alignItems: 'center', gap: '6px',
+                                    padding: '8px 14px', borderRadius: '10px',
                                     background: 'rgba(255,255,255,0.15)',
                                     border: '1px solid rgba(255,255,255,0.2)',
                                     color: 'white', cursor: 'pointer',
-                                    fontSize: '0.6rem', backdropFilter: 'blur(8px)',
+                                    fontSize: '0.65rem', backdropFilter: 'blur(8px)',
                                     transition: 'all 0.3s ease'
                                 }}>
-                                    <RefreshCw size={12} />
+                                    <RefreshCw size={14} />
                                 </button>
                             </div>
                         </div>
                     </div>
 
-                    {/* ===== CONTROL BAR - MOBILE FRIENDLY ===== */}
+                    {/* ===== CONTROL BAR ===== */}
                     <div style={{
                         display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between',
-                        gap: '8px', padding: '10px 14px', background: 'var(--card-bg)',
+                        gap: '10px', padding: '12px 16px', background: 'var(--card-bg)',
                         borderRadius: '12px', border: '1px solid var(--border-color)',
-                        boxShadow: '0 2px 12px rgba(0,0,0,0.04)', marginBottom: '16px'
+                        boxShadow: '0 2px 12px rgba(0,0,0,0.04)', marginBottom: '20px'
                     }}>
-                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', flex: 1 }}>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', flex: 1 }}>
                             <select
                                 value={reportType}
                                 onChange={(e) => setReportType(e.target.value)}
                                 style={{
-                                    padding: '6px 10px', paddingRight: '28px',
+                                    padding: '8px 12px', paddingRight: '32px',
                                     border: '2px solid var(--border-color)',
-                                    borderRadius: '8px', fontSize: '0.65rem',
+                                    borderRadius: '8px', fontSize: '0.7rem',
                                     background: 'var(--bg-primary)', color: 'var(--text-primary)',
-                                    outline: 'none', cursor: 'pointer', minWidth: '100px',
+                                    outline: 'none', cursor: 'pointer', minWidth: '120px',
                                     transition: 'all 0.2s ease',
                                     appearance: 'none'
                                 }}
                             >
                                 <option value="all">📊 All</option>
-                                <option value="financial">💰 Fin</option>
+                                <option value="financial">💰 Financial</option>
                                 <option value="patients">👤 Patients</option>
-                                <option value="appointments">📅 Appt</option>
-                                <option value="doctors">🩺 Docs</option>
-                                <option value="pharmacy">💊 Pharma</option>
+                                <option value="appointments">📅 Appointments</option>
+                                <option value="doctors">🩺 Doctors</option>
+                                <option value="pharmacy">💊 Pharmacy</option>
                             </select>
-                            <ChevronDown size={12} style={{
-                                position: 'absolute', marginLeft: '-22px', marginTop: '8px',
-                                color: 'var(--text-muted)', pointerEvents: 'none'
-                            }} />
 
-                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                <Calendar size={12} style={{ color: 'var(--text-muted)' }} />
+                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                <Calendar size={14} style={{ color: 'var(--text-muted)' }} />
                                 <input type="date" value={dateRange.start}
                                     onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
-                                    style={{ padding: '4px 6px', border: '2px solid var(--border-color)', borderRadius: '6px', fontSize: '0.6rem', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none', width: '90px' }} />
-                                <span style={{ color: 'var(--text-muted)', fontSize: '0.6rem' }}>to</span>
+                                    style={{ padding: '6px 8px', border: '2px solid var(--border-color)', borderRadius: '8px', fontSize: '0.65rem', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none', width: '110px' }} />
+                                <span style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>to</span>
                                 <input type="date" value={dateRange.end}
                                     onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
-                                    style={{ padding: '4px 6px', border: '2px solid var(--border-color)', borderRadius: '6px', fontSize: '0.6rem', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none', width: '90px' }} />
+                                    style={{ padding: '6px 8px', border: '2px solid var(--border-color)', borderRadius: '8px', fontSize: '0.65rem', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none', width: '110px' }} />
                             </div>
 
                             <button
                                 onClick={() => setShowFilterPopup(!showFilterPopup)}
                                 style={{
-                                    display: 'flex', alignItems: 'center', gap: '4px',
-                                    padding: '6px 10px', border: '2px solid var(--border-color)',
+                                    display: 'flex', alignItems: 'center', gap: '6px',
+                                    padding: '8px 14px', border: '2px solid var(--border-color)',
                                     borderRadius: '8px', background: 'var(--bg-primary)',
-                                    cursor: 'pointer', fontSize: '0.6rem',
+                                    cursor: 'pointer', fontSize: '0.65rem',
                                     color: 'var(--text-secondary)', transition: 'all 0.3s ease',
                                     position: 'relative'
                                 }}
                             >
-                                <Filter size={12} style={{ color: 'var(--primary-color)' }} />
+                                <Filter size={14} style={{ color: 'var(--primary-color)' }} />
+                                Filters
                                 {getFilterCount() > 0 && (
                                     <span style={{
                                         position: 'absolute', top: '-4px', right: '-4px',
-                                        width: '14px', height: '14px', borderRadius: '50%',
-                                        background: '#EF4444', color: 'white', fontSize: '0.4rem',
+                                        width: '16px', height: '16px', borderRadius: '50%',
+                                        background: '#EF4444', color: 'white', fontSize: '0.45rem',
                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                                         fontWeight: 700
                                     }}>
@@ -850,137 +2242,137 @@ const Reports = () => {
                                 )}
                             </button>
                         </div>
-                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
                             <div style={{
-                                display: 'flex', gap: '2px',
+                                display: 'flex', gap: '4px',
                                 background: 'var(--bg-primary)',
                                 borderRadius: '8px',
-                                padding: '2px',
+                                padding: '3px',
                                 border: '2px solid var(--border-color)'
                             }}>
                                 <button onClick={() => setViewMode('grid')}
                                     style={{
-                                        padding: '3px 6px', borderRadius: '4px', border: 'none',
+                                        padding: '4px 8px', borderRadius: '6px', border: 'none',
                                         background: viewMode === 'grid' ? 'var(--primary-color)' : 'transparent',
                                         color: viewMode === 'grid' ? 'white' : 'var(--text-secondary)',
                                         cursor: 'pointer', transition: 'all 0.3s ease',
-                                        display: 'flex', alignItems: 'center', gap: '2px',
-                                        fontSize: '0.5rem'
+                                        display: 'flex', alignItems: 'center', gap: '4px',
+                                        fontSize: '0.6rem'
                                     }}>
-                                    <LayoutGrid size={10} />
+                                    <LayoutGrid size={14} />
                                 </button>
                                 <button onClick={() => setViewMode('list')}
                                     style={{
-                                        padding: '3px 6px', borderRadius: '4px', border: 'none',
+                                        padding: '4px 8px', borderRadius: '6px', border: 'none',
                                         background: viewMode === 'list' ? 'var(--primary-color)' : 'transparent',
                                         color: viewMode === 'list' ? 'white' : 'var(--text-secondary)',
                                         cursor: 'pointer', transition: 'all 0.3s ease',
-                                        display: 'flex', alignItems: 'center', gap: '2px',
-                                        fontSize: '0.5rem'
+                                        display: 'flex', alignItems: 'center', gap: '4px',
+                                        fontSize: '0.6rem'
                                     }}>
-                                    <List size={10} />
+                                    <List size={14} />
                                 </button>
                             </div>
 
                             <button onClick={handlePrint}
                                 style={{
-                                    display: 'flex', alignItems: 'center', gap: '3px',
-                                    padding: '4px 8px', border: '2px solid var(--border-color)',
+                                    display: 'flex', alignItems: 'center', gap: '4px',
+                                    padding: '6px 12px', border: '2px solid var(--border-color)',
                                     borderRadius: '8px', background: 'var(--bg-primary)',
-                                    cursor: 'pointer', fontSize: '0.55rem',
+                                    cursor: 'pointer', fontSize: '0.6rem',
                                     color: 'var(--text-secondary)', transition: 'all 0.3s ease'
                                 }}>
-                                <Printer size={12} />
+                                <Printer size={14} />
                             </button>
-                            {/* ===== EXPORT BUTTON - MOBILE FRIENDLY ===== */}
+
                             <div style={{ position: 'relative' }}>
                                 <button
                                     onClick={() => setShowExportMenu(!showExportMenu)}
                                     disabled={exporting}
                                     style={{
-                                        display: 'flex', alignItems: 'center', gap: '3px',
-                                        padding: '4px 8px', border: '2px solid var(--border-color)',
+                                        display: 'flex', alignItems: 'center', gap: '4px',
+                                        padding: '6px 12px', border: '2px solid var(--border-color)',
                                         borderRadius: '8px', background: 'var(--bg-primary)',
                                         cursor: exporting ? 'not-allowed' : 'pointer',
-                                        fontSize: '0.55rem', color: 'var(--text-secondary)',
+                                        fontSize: '0.6rem', color: 'var(--text-secondary)',
                                         opacity: exporting ? 0.6 : 1, transition: 'all 0.3s ease'
                                     }}
                                 >
-                                    {exporting ? <Loader size={12} className="spinning" /> : <Download size={12} />}
-                                    <ChevronDown size={10} />
+                                    {exporting ? <Loader size={14} className="spinning" /> : <Download size={14} />}
+                                    <ChevronDown size={12} />
                                 </button>
                                 {showExportMenu && !exporting && (
                                     <div style={{
                                         position: 'absolute',
-                                        top: 'calc(100% + 4px)',
+                                        top: 'calc(100% + 6px)',
                                         right: 0,
                                         background: 'var(--card-bg)',
                                         border: '2px solid var(--border-color)',
                                         borderRadius: '10px',
                                         boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
-                                        minWidth: '120px',
+                                        minWidth: '140px',
                                         zIndex: 100,
-                                        padding: '4px 0',
+                                        padding: '6px 0',
                                         animation: 'slideDown 0.2s ease'
                                     }}>
                                         <button onClick={handleExportCSV} style={{
-                                            display: 'flex', alignItems: 'center', gap: '8px',
-                                            padding: '6px 12px', width: '100%', border: 'none',
+                                            display: 'flex', alignItems: 'center', gap: '10px',
+                                            padding: '8px 14px', width: '100%', border: 'none',
                                             background: 'transparent', cursor: 'pointer',
-                                            fontSize: '0.65rem', color: 'var(--text-primary)',
+                                            fontSize: '0.7rem', color: 'var(--text-primary)',
                                             transition: 'all 0.15s ease'
                                         }}
                                             onMouseEnter={e => e.currentTarget.style.background = 'var(--hover-bg)'}
                                             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                                            <FileText size={12} style={{ color: '#3B82F6' }} /> CSV
+                                            <FileText size={14} style={{ color: '#3B82F6' }} /> CSV
                                         </button>
                                         <button onClick={handleExportExcel} style={{
-                                            display: 'flex', alignItems: 'center', gap: '8px',
-                                            padding: '6px 12px', width: '100%', border: 'none',
+                                            display: 'flex', alignItems: 'center', gap: '10px',
+                                            padding: '8px 14px', width: '100%', border: 'none',
                                             background: 'transparent', cursor: 'pointer',
-                                            fontSize: '0.65rem', color: 'var(--text-primary)',
+                                            fontSize: '0.7rem', color: 'var(--text-primary)',
                                             transition: 'all 0.15s ease'
                                         }}
                                             onMouseEnter={e => e.currentTarget.style.background = 'var(--hover-bg)'}
                                             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                                            <FileSpreadsheet size={12} style={{ color: '#22C55E' }} /> Excel
+                                            <FileSpreadsheet size={14} style={{ color: '#22C55E' }} /> Excel
                                         </button>
                                         <button onClick={handleExportJSON} style={{
-                                            display: 'flex', alignItems: 'center', gap: '8px',
-                                            padding: '6px 12px', width: '100%', border: 'none',
+                                            display: 'flex', alignItems: 'center', gap: '10px',
+                                            padding: '8px 14px', width: '100%', border: 'none',
                                             background: 'transparent', cursor: 'pointer',
-                                            fontSize: '0.65rem', color: 'var(--text-primary)',
+                                            fontSize: '0.7rem', color: 'var(--text-primary)',
                                             transition: 'all 0.15s ease'
                                         }}
                                             onMouseEnter={e => e.currentTarget.style.background = 'var(--hover-bg)'}
                                             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                                            <FileJson size={12} style={{ color: '#8B5CF6' }} /> JSON
+                                            <FileJson size={14} style={{ color: '#8B5CF6' }} /> JSON
                                         </button>
                                         <button onClick={handlePrint} style={{
-                                            display: 'flex', alignItems: 'center', gap: '8px',
-                                            padding: '6px 12px', width: '100%', border: 'none',
+                                            display: 'flex', alignItems: 'center', gap: '10px',
+                                            padding: '8px 14px', width: '100%', border: 'none',
                                             background: 'transparent', cursor: 'pointer',
-                                            fontSize: '0.65rem', color: 'var(--text-primary)',
+                                            fontSize: '0.7rem', color: 'var(--text-primary)',
                                             borderTop: '1px solid var(--border-color)',
-                                            marginTop: '4px', paddingTop: '6px',
+                                            marginTop: '4px', paddingTop: '8px',
                                             transition: 'all 0.15s ease'
                                         }}
                                             onMouseEnter={e => e.currentTarget.style.background = 'var(--hover-bg)'}
                                             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                                            <Printer size={12} style={{ color: '#F59E0B' }} /> Print
+                                            <Printer size={14} style={{ color: '#F59E0B' }} /> Print
                                         </button>
                                         <button onClick={() => setShowExportMenu(false)} style={{
-                                            display: 'flex', alignItems: 'center', gap: '8px',
-                                            padding: '6px 12px', width: '100%', border: 'none',
+                                            display: 'flex', alignItems: 'center', gap: '10px',
+                                            padding: '8px 14px', width: '100%', border: 'none',
                                             background: 'transparent', cursor: 'pointer',
-                                            fontSize: '0.65rem', color: 'var(--text-secondary)',
+                                            fontSize: '0.7rem', color: 'var(--text-secondary)',
                                             borderTop: '1px solid var(--border-color)',
-                                            paddingTop: '6px',
+                                            paddingTop: '8px',
                                             transition: 'all 0.15s ease'
                                         }}
                                             onMouseEnter={e => { e.currentTarget.style.background = 'var(--hover-bg)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
                                             onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}>
-                                            <X size={12} /> Close
+                                            <X size={14} /> Close
                                         </button>
                                     </div>
                                 )}
@@ -988,37 +2380,37 @@ const Reports = () => {
                         </div>
                     </div>
 
-                    {/* ===== FILTER POPUP - MOBILE FRIENDLY ===== */}
+                    {/* ===== FILTER POPUP ===== */}
                     {showFilterPopup && (
-                        <div style={{ marginBottom: '16px', animation: 'slideDown 0.3s ease-out' }}>
+                        <div style={{ marginBottom: '20px', animation: 'slideDown 0.3s ease-out' }}>
                             <div style={{
                                 background: 'var(--card-bg)',
                                 borderRadius: '12px',
-                                padding: '16px',
+                                padding: '20px',
                                 border: '2px solid var(--primary-color)',
                                 boxShadow: '0 10px 40px rgba(0,0,0,0.12)'
                             }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                                    <h3 style={{ fontSize: '0.8rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <Filter size={14} style={{ color: 'var(--primary-color)' }} />
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                    <h3 style={{ fontSize: '0.9rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <Filter size={18} style={{ color: 'var(--primary-color)' }} />
                                         Filters
                                         {getFilterCount() > 0 && (
-                                            <span style={{ padding: '1px 8px', borderRadius: '12px', background: '#EF4444', color: 'white', fontSize: '0.5rem' }}>
+                                            <span style={{ padding: '2px 10px', borderRadius: '12px', background: '#EF4444', color: 'white', fontSize: '0.55rem' }}>
                                                 {getFilterCount()}
                                             </span>
                                         )}
                                     </h3>
                                     <button onClick={() => setShowFilterPopup(false)}
                                         style={{ padding: '4px', border: 'none', background: 'var(--bg-light)', cursor: 'pointer', color: 'var(--text-muted)', borderRadius: '6px' }}>
-                                        <X size={16} />
+                                        <X size={20} />
                                     </button>
                                 </div>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
                                     <div>
-                                        <label style={{ fontSize: '0.5rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '2px' }}>Status</label>
+                                        <label style={{ fontSize: '0.55rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Status</label>
                                         <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
-                                            style={{ width: '100%', padding: '6px 8px', border: '2px solid var(--border-color)', borderRadius: '6px', fontSize: '0.6rem', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none' }}>
+                                            style={{ width: '100%', padding: '8px 10px', border: '2px solid var(--border-color)', borderRadius: '8px', fontSize: '0.65rem', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none' }}>
                                             <option value="all">All</option>
                                             <option value="paid">✅ Paid</option>
                                             <option value="pending">⏳ Pending</option>
@@ -1028,9 +2420,9 @@ const Reports = () => {
                                     </div>
 
                                     <div>
-                                        <label style={{ fontSize: '0.5rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '2px' }}>Method</label>
+                                        <label style={{ fontSize: '0.55rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Method</label>
                                         <select value={filterPaymentMethod} onChange={(e) => setFilterPaymentMethod(e.target.value)}
-                                            style={{ width: '100%', padding: '6px 8px', border: '2px solid var(--border-color)', borderRadius: '6px', fontSize: '0.6rem', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none' }}>
+                                            style={{ width: '100%', padding: '8px 10px', border: '2px solid var(--border-color)', borderRadius: '8px', fontSize: '0.65rem', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none' }}>
                                             <option value="all">All</option>
                                             <option value="cash">💵 Cash</option>
                                             <option value="card">💳 Card</option>
@@ -1041,9 +2433,9 @@ const Reports = () => {
                                     </div>
 
                                     <div>
-                                        <label style={{ fontSize: '0.5rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '2px' }}>Dept</label>
+                                        <label style={{ fontSize: '0.55rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Department</label>
                                         <select value={filterDepartment} onChange={(e) => setFilterDepartment(e.target.value)}
-                                            style={{ width: '100%', padding: '6px 8px', border: '2px solid var(--border-color)', borderRadius: '6px', fontSize: '0.6rem', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none' }}>
+                                            style={{ width: '100%', padding: '8px 10px', border: '2px solid var(--border-color)', borderRadius: '8px', fontSize: '0.65rem', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none' }}>
                                             <option value="all">All</option>
                                             <option value="General">🏥 General</option>
                                             <option value="Pharmacy">💊 Pharmacy</option>
@@ -1054,47 +2446,47 @@ const Reports = () => {
                                     </div>
 
                                     <div>
-                                        <label style={{ fontSize: '0.5rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '2px' }}>Amount</label>
-                                        <div style={{ display: 'flex', gap: '4px' }}>
+                                        <label style={{ fontSize: '0.55rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Amount Range</label>
+                                        <div style={{ display: 'flex', gap: '6px' }}>
                                             <input type="number" placeholder="Min" value={filterMinAmount} onChange={(e) => setFilterMinAmount(e.target.value)}
-                                                style={{ width: '50%', padding: '6px 6px', border: '2px solid var(--border-color)', borderRadius: '6px', fontSize: '0.6rem', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none' }} />
+                                                style={{ width: '50%', padding: '8px 8px', border: '2px solid var(--border-color)', borderRadius: '8px', fontSize: '0.65rem', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none' }} />
                                             <input type="number" placeholder="Max" value={filterMaxAmount} onChange={(e) => setFilterMaxAmount(e.target.value)}
-                                                style={{ width: '50%', padding: '6px 6px', border: '2px solid var(--border-color)', borderRadius: '6px', fontSize: '0.6rem', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none' }} />
+                                                style={{ width: '50%', padding: '8px 8px', border: '2px solid var(--border-color)', borderRadius: '8px', fontSize: '0.65rem', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none' }} />
                                         </div>
                                     </div>
                                 </div>
 
-                                <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', paddingTop: '10px', borderTop: '1px solid var(--border-color)' }}>
+                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}>
                                     <button onClick={clearFilters}
-                                        style={{ padding: '6px 14px', border: '2px solid var(--border-color)', borderRadius: '6px', background: 'transparent', cursor: 'pointer', fontSize: '0.6rem', color: 'var(--text-secondary)' }}>
-                                        Clear
+                                        style={{ padding: '8px 16px', border: '2px solid var(--border-color)', borderRadius: '8px', background: 'transparent', cursor: 'pointer', fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
+                                        Clear All
                                     </button>
                                     <button onClick={applyFilters}
-                                        style={{ padding: '6px 16px', border: 'none', borderRadius: '6px', background: 'linear-gradient(135deg, var(--primary-color), #1D4ED8)', color: 'white', cursor: 'pointer', fontSize: '0.6rem', fontWeight: 600, boxShadow: '0 4px 12px rgba(59,130,246,0.3)' }}>
-                                        Apply
+                                        style={{ padding: '8px 20px', border: 'none', borderRadius: '8px', background: 'linear-gradient(135deg, var(--primary-color), #1D4ED8)', color: 'white', cursor: 'pointer', fontSize: '0.65rem', fontWeight: 600, boxShadow: '0 4px 12px rgba(59,130,246,0.3)' }}>
+                                        Apply Filters
                                     </button>
                                 </div>
 
                                 {getFilterCount() > 0 && (
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border-color)' }}>
-                                        <span style={{ fontSize: '0.5rem', color: 'var(--text-muted)' }}>Active:</span>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}>
+                                        <span style={{ fontSize: '0.55rem', color: 'var(--text-muted)' }}>Active filters:</span>
                                         {filterStatus !== 'all' && (
-                                            <span style={{ padding: '1px 8px', borderRadius: '10px', background: 'var(--primary-light)', color: 'var(--primary-color)', fontSize: '0.5rem' }}>
+                                            <span style={{ padding: '2px 10px', borderRadius: '12px', background: 'var(--primary-light)', color: 'var(--primary-color)', fontSize: '0.55rem' }}>
                                                 Status: {filterStatus}
                                             </span>
                                         )}
                                         {filterPaymentMethod !== 'all' && (
-                                            <span style={{ padding: '1px 8px', borderRadius: '10px', background: '#DBEAFE', color: '#2563EB', fontSize: '0.5rem' }}>
+                                            <span style={{ padding: '2px 10px', borderRadius: '12px', background: '#DBEAFE', color: '#2563EB', fontSize: '0.55rem' }}>
                                                 Method: {filterPaymentMethod}
                                             </span>
                                         )}
                                         {filterDepartment !== 'all' && (
-                                            <span style={{ padding: '1px 8px', borderRadius: '10px', background: '#EDE9FE', color: '#7C3AED', fontSize: '0.5rem' }}>
+                                            <span style={{ padding: '2px 10px', borderRadius: '12px', background: '#EDE9FE', color: '#7C3AED', fontSize: '0.55rem' }}>
                                                 Dept: {filterDepartment}
                                             </span>
                                         )}
                                         {(filterMinAmount || filterMaxAmount) && (
-                                            <span style={{ padding: '1px 8px', borderRadius: '10px', background: '#FEF3C7', color: '#D97706', fontSize: '0.5rem' }}>
+                                            <span style={{ padding: '2px 10px', borderRadius: '12px', background: '#FEF3C7', color: '#D97706', fontSize: '0.55rem' }}>
                                                 Amount: {filterMinAmount || '0'} - {filterMaxAmount || '∞'}
                                             </span>
                                         )}
@@ -1104,529 +2496,137 @@ const Reports = () => {
                         </div>
                     )}
 
-                    {/* ===== FILTER RESULTS INFO - MOBILE ===== */}
+                    {/* ===== FILTER RESULTS INFO ===== */}
                     <div style={{
                         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                        padding: '6px 12px', background: 'var(--bg-light)', borderRadius: '8px',
-                        marginBottom: '12px', border: '1px solid var(--border-color)',
-                        flexWrap: 'wrap', gap: '4px'
+                        padding: '8px 16px', background: 'var(--bg-light)', borderRadius: '10px',
+                        marginBottom: '16px', border: '1px solid var(--border-color)',
+                        flexWrap: 'wrap', gap: '6px'
                     }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <FileText size={12} style={{ color: 'var(--primary-color)' }} />
-                            <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
-                                <strong style={{ color: 'var(--text-primary)' }}>{filteredInvoices.length}</strong> invoices
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <FileText size={16} style={{ color: 'var(--primary-color)' }} />
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                <strong style={{ color: 'var(--text-primary)' }}>{filteredInvoices.length}</strong> invoices found
                             </span>
+                            {getFilterCount() > 0 && (
+                                <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>
+                                    • {getFilterCount()} filter{getFilterCount() > 1 ? 's' : ''} active
+                                </span>
+                            )}
                         </div>
                         {getFilterCount() > 0 && (
                             <button onClick={clearFilters}
-                                style={{ display: 'flex', alignItems: 'center', gap: '2px', padding: '2px 8px', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'transparent', cursor: 'pointer', fontSize: '0.55rem', color: 'var(--text-secondary)' }}>
-                                <X size={10} /> Clear
+                                style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 12px', border: '1px solid var(--border-color)', borderRadius: '6px', background: 'transparent', cursor: 'pointer', fontSize: '0.6rem', color: 'var(--text-secondary)' }}>
+                                <X size={12} /> Clear filters
                             </button>
                         )}
                     </div>
 
-                    {/* ===== KPI CARDS - MOBILE ===== */}
+                    {/* ===== TABS NAVIGATION ===== */}
                     <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(2, 1fr)',
-                        gap: '10px',
-                        marginBottom: '16px'
+                        display: 'flex',
+                        gap: '6px',
+                        overflowX: 'auto',
+                        padding: '4px 2px',
+                        marginBottom: '20px',
+                        borderBottom: '2px solid var(--border-color)',
+                        scrollbarWidth: 'none',
+                        msOverflowStyle: 'none',
+                        WebkitOverflowScrolling: 'touch'
                     }}>
-                        {[
-                            { icon: TrendingUp, label: 'Revenue', value: formatCurrency(stats.totalRevenue), change: `${stats.revenueChange >= 0 ? '+' : ''}${stats.revenueChange.toFixed(1)}%`, color: '#10B981', bg: '#DCFCE7' },
-                            { icon: AlertCircle, label: 'Pending', value: formatCurrency(stats.pendingRevenue), change: `${stats.pendingInvoices} inv`, color: '#EF4444', bg: '#FEE2E2' },
-                            { icon: Target, label: 'Collection', value: `${stats.collectionRate.toFixed(1)}%`, change: `Avg: ${formatCurrency(stats.averageInvoice)}`, color: '#3B82F6', bg: '#DBEAFE' },
-                            { icon: Award, label: 'Invoices', value: filteredInvoices.length, change: `${filteredInvoices.filter(inv => inv.status === 'paid').length} Paid`, color: '#8B5CF6', bg: '#EDE9FE' },
-                        ].map((card, i) => (
-                            <div key={i} style={{
-                                background: 'var(--card-bg)',
-                                borderRadius: '10px',
-                                padding: '12px 14px',
-                                border: '1px solid var(--border-color)',
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                                transition: 'all 0.3s ease',
-                                position: 'relative',
-                                overflow: 'hidden'
-                            }}>
-                                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{ fontSize: '0.45rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
-                                            {card.label}
-                                        </div>
-                                        <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                                            {card.value}
-                                        </div>
-                                        <div style={{ fontSize: '0.5rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                                            <span style={{ color: stats.revenueChange >= 0 ? '#10B981' : '#EF4444', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '2px' }}>
-                                                {stats.revenueChange >= 0 ? <ArrowUp size={8} /> : <ArrowDown size={8} />}
-                                                {card.change}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div style={{ padding: '6px', borderRadius: '8px', background: card.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        <card.icon size={14} style={{ color: card.color }} />
-                                    </div>
-                                </div>
-                                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '2px', background: `linear-gradient(90deg, ${card.color}, ${card.color}88)`, borderRadius: '0 0 10px 10px' }} />
-                            </div>
+                        {tabs.map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    padding: '10px 20px',
+                                    borderRadius: '10px 10px 0 0',
+                                    border: 'none',
+                                    background: activeTab === tab.id ? 'var(--primary-color)' : 'transparent',
+                                    color: activeTab === tab.id ? 'white' : 'var(--text-secondary)',
+                                    cursor: 'pointer',
+                                    fontSize: '0.75rem',
+                                    fontWeight: activeTab === tab.id ? 600 : 500,
+                                    whiteSpace: 'nowrap',
+                                    transition: 'all 0.3s ease',
+                                    position: 'relative',
+                                    minWidth: '80px',
+                                    justifyContent: 'center'
+                                }}
+                            >
+                                {tab.icon}
+                                <span className="tab-label">{tab.label}</span>
+                                {activeTab === tab.id && (
+                                    <div style={{
+                                        position: 'absolute',
+                                        bottom: '-2px',
+                                        left: 0,
+                                        right: 0,
+                                        height: '3px',
+                                        background: 'white',
+                                        borderRadius: '3px'
+                                    }} />
+                                )}
+                            </button>
                         ))}
                     </div>
 
-                    {/* ===== SECONDARY METRICS - MOBILE ===== */}
+                    {/* ===== TAB CONTENT ===== */}
                     <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(3, 1fr)',
-                        gap: '8px',
-                        marginBottom: '16px'
+                        animation: 'fadeIn 0.3s ease-out',
+                        minHeight: '400px'
                     }}>
-                        {[
-                            { icon: Calendar, label: 'Today', value: formatCurrency(stats.todayRevenue), color: '#10B981' },
-                            { icon: CalendarDays, label: 'Month', value: formatCurrency(stats.monthlyRevenue), color: '#3B82F6' },
-                            { icon: Clock, label: 'Week', value: formatCurrency(stats.weeklyRevenue), color: '#8B5CF6' },
-                            { icon: Users, label: 'Patients', value: stats.totalPatients, color: '#F59E0B' },
-                            { icon: Stethoscope, label: 'Doctors', value: stats.totalDoctors, color: '#EC4899' },
-                            { icon: Pill, label: 'Medicines', value: stats.totalMedicines, color: '#14B8A6' },
-                        ].map((metric, i) => (
-                            <div key={i} style={{
-                                background: 'var(--card-bg)',
-                                borderRadius: '8px',
-                                padding: '8px 10px',
-                                border: '1px solid var(--border-color)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                transition: 'all 0.3s ease'
-                            }}>
-                                <div style={{ padding: '4px', borderRadius: '6px', background: metric.color + '12', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <metric.icon size={10} style={{ color: metric.color }} />
-                                </div>
-                                <div style={{ minWidth: 0, flex: 1 }}>
-                                    <div style={{ fontSize: '0.4rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                                        {metric.label}
-                                    </div>
-                                    <div style={{ fontSize: '0.6rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                                        {metric.value}
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
+                        {renderTabContent()}
                     </div>
 
-                    {/* ===== CHARTS SECTION - MOBILE ===== */}
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: '1fr',
-                        gap: '12px',
-                        marginBottom: '16px'
-                    }}>
-                        {/* Monthly Chart */}
-                        <div style={{
-                            background: 'var(--card-bg)',
-                            borderRadius: '10px',
-                            padding: '12px',
-                            border: '1px solid var(--border-color)',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-                        }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                <h3 style={{ fontWeight: 600, fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <BarChart3 size={12} style={{ color: 'var(--primary-color)' }} /> Monthly
-                                </h3>
-                                <span style={{ fontSize: '0.5rem', color: 'var(--text-muted)' }}>Last 12 Months</span>
-                            </div>
-                            <div style={{ height: '120px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', paddingBottom: '8px', borderBottom: '1px solid var(--border-color)' }}>
-                                {stats.monthlyData && stats.monthlyData.length > 0 ? (
-                                    stats.monthlyData.map((data, index) => {
-                                        const maxRevenue = Math.max(...stats.monthlyData.map(d => d.revenue), 1000);
-                                        const heightPct = Math.max((data.revenue / maxRevenue) * 100, 5);
-                                        return (
-                                            <div key={index} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, gap: '1px' }}>
-                                                <div style={{ fontSize: '0.35rem', fontWeight: 600, color: data.revenue > 0 ? 'var(--text-primary)' : 'var(--text-muted)', opacity: data.revenue > 0 ? 1 : 0.4 }}>
-                                                    {data.revenue > 0 ? formatCurrency(data.revenue).replace('Rs. ', '') : '0'}
-                                                </div>
-                                                <div style={{
-                                                    width: '40%',
-                                                    height: `${heightPct}px`,
-                                                    background: data.revenue > 0 ? `linear-gradient(to top, var(--primary-color), #60A5FA)` : '#E5E7EB',
-                                                    borderRadius: '2px 2px 0 0',
-                                                    transition: 'all 0.6s ease',
-                                                    minHeight: '2px'
-                                                }} />
-                                                <span style={{ fontSize: '0.4rem', color: 'var(--text-muted)', marginTop: '1px' }}>{data.month}</span>
-                                            </div>
-                                        );
-                                    })
-                                ) : (
-                                    <div style={{ width: '100%', textAlign: 'center', color: 'var(--text-muted)', padding: '20px 0', fontSize: '0.6rem' }}>No data</div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Weekly Chart */}
-                        <div style={{
-                            background: 'var(--card-bg)',
-                            borderRadius: '10px',
-                            padding: '12px',
-                            border: '1px solid var(--border-color)',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-                        }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                <h3 style={{ fontWeight: 600, fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <Activity size={12} style={{ color: '#8B5CF6' }} /> Weekly
-                                </h3>
-                                <span style={{ fontSize: '0.5rem', color: 'var(--text-muted)' }}>Last 7 Days</span>
-                            </div>
-                            <div style={{ height: '120px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', paddingBottom: '8px', borderBottom: '1px solid var(--border-color)' }}>
-                                {stats.weeklyData && stats.weeklyData.length > 0 ? (
-                                    stats.weeklyData.map((data, index) => {
-                                        const maxRevenue = Math.max(...stats.weeklyData.map(d => d.revenue), 1000);
-                                        const heightPct = Math.max((data.revenue / maxRevenue) * 100, 5);
-                                        return (
-                                            <div key={index} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, gap: '1px' }}>
-                                                <div style={{ fontSize: '0.35rem', fontWeight: 600, color: data.revenue > 0 ? 'var(--text-primary)' : 'var(--text-muted)', opacity: data.revenue > 0 ? 1 : 0.4 }}>
-                                                    {data.revenue > 0 ? formatCurrency(data.revenue).replace('Rs. ', '') : '0'}
-                                                </div>
-                                                <div style={{
-                                                    width: '40%',
-                                                    height: `${heightPct}px`,
-                                                    background: data.revenue > 0 ? `linear-gradient(to top, #8B5CF6, #C084FC)` : '#E5E7EB',
-                                                    borderRadius: '2px 2px 0 0',
-                                                    transition: 'all 0.6s ease',
-                                                    minHeight: '2px'
-                                                }} />
-                                                <span style={{ fontSize: '0.4rem', color: 'var(--text-muted)', marginTop: '1px' }}>{data.date}</span>
-                                            </div>
-                                        );
-                                    })
-                                ) : (
-                                    <div style={{ width: '100%', textAlign: 'center', color: 'var(--text-muted)', padding: '20px 0', fontSize: '0.6rem' }}>No data</div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* ===== PAYMENT METHODS & STATUS - MOBILE ===== */}
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: '1fr 1fr',
-                        gap: '12px',
-                        marginBottom: '16px'
-                    }}>
-                        {/* Payment Methods */}
-                        <div style={{
-                            background: 'var(--card-bg)',
-                            borderRadius: '10px',
-                            padding: '12px',
-                            border: '1px solid var(--border-color)',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-                        }}>
-                            <h3 style={{ fontWeight: 600, fontSize: '0.65rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <PieChart size={12} style={{ color: '#F59E0B' }} /> Methods
-                            </h3>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '4px' }}>
-                                {Object.entries(stats.paymentMethods).map(([key, data]) => {
-                                    const percentage = stats.totalRevenue > 0 ? (data.amount / stats.totalRevenue) * 100 : 0;
-                                    const colors = { cash: '#10B981', card: '#3B82F6', bankTransfer: '#8B5CF6', insurance: '#F59E0B', online: '#EC4899' };
-                                    const color = colors[key] || '#6B7280';
-                                    return (
-                                        <div key={key} style={{ padding: '4px 8px', background: 'var(--bg-light)', borderRadius: '4px', borderLeft: `2px solid ${color}` }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                <span style={{ fontWeight: 600, fontSize: '0.5rem' }}>{key.charAt(0).toUpperCase() + key.slice(1)}</span>
-                                                <span style={{ fontSize: '0.45rem', color: 'var(--text-muted)' }}>{data.count}</span>
-                                            </div>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                <span style={{ fontSize: '0.55rem', fontWeight: 600 }}>{formatCurrency(data.amount)}</span>
-                                                <span style={{ fontSize: '0.45rem', color: 'var(--text-muted)' }}>{percentage.toFixed(0)}%</span>
-                                            </div>
-                                            <div style={{ width: '100%', height: '2px', background: 'var(--bg-dark)', borderRadius: '2px', marginTop: '2px', overflow: 'hidden' }}>
-                                                <div style={{ width: `${percentage}%`, height: '100%', background: color, borderRadius: '2px', transition: 'width 0.6s ease' }} />
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        {/* Status Breakdown */}
-                        <div style={{
-                            background: 'var(--card-bg)',
-                            borderRadius: '10px',
-                            padding: '12px',
-                            border: '1px solid var(--border-color)',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-                        }}>
-                            <h3 style={{ fontWeight: 600, fontSize: '0.65rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <Activity size={12} style={{ color: '#3B82F6' }} /> Status
-                            </h3>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                                {stats.statusBreakdown.map((item, index) => (
-                                    <div key={index} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 8px', background: 'var(--bg-light)', borderRadius: '4px', borderLeft: `2px solid ${item.color}` }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                            <span style={{ fontSize: '0.6rem' }}>{item.icon}</span>
-                                            <span style={{ fontWeight: 500, fontSize: '0.55rem' }}>{item.status}</span>
-                                            <span style={{ fontSize: '0.45rem', color: 'var(--text-muted)' }}>{item.count}</span>
-                                        </div>
-                                        <div style={{ fontWeight: 600, fontSize: '0.55rem' }}>{item.amount > 0 ? formatCurrency(item.amount) : '—'}</div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* ===== TOP DOCTORS & SERVICES - MOBILE ===== */}
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: '1fr 1fr',
-                        gap: '12px',
-                        marginBottom: '16px'
-                    }}>
-                        {/* Top Doctors */}
-                        <div style={{
-                            background: 'var(--card-bg)',
-                            borderRadius: '10px',
-                            padding: '12px',
-                            border: '1px solid var(--border-color)',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-                        }}>
-                            <h3 style={{ fontWeight: 600, fontSize: '0.65rem', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <Stethoscope size={12} style={{ color: '#EC4899' }} /> Top Doctors
-                            </h3>
-                            {stats.topDoctors.length > 0 ? (
-                                stats.topDoctors.slice(0, 3).map((doc, index) => (
-                                    <div key={index} style={{
-                                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                        padding: '4px 8px',
-                                        background: index === 0 ? 'var(--primary-light)' : 'var(--bg-light)',
-                                        borderRadius: '4px',
-                                        marginBottom: '3px'
-                                    }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                            <span style={{ fontWeight: 700, fontSize: '0.5rem', color: index === 0 ? 'var(--primary-color)' : 'var(--text-muted)' }}>#{index + 1}</span>
-                                            <span style={{ fontWeight: 500, fontSize: '0.55rem' }}>{doc.name}</span>
-                                        </div>
-                                        <div style={{ fontWeight: 600, fontSize: '0.55rem' }}>{formatCurrency(doc.amount)}</div>
-                                    </div>
-                                ))
-                            ) : (
-                                <div style={{ textAlign: 'center', padding: '8px', color: 'var(--text-muted)', fontSize: '0.6rem' }}>No data</div>
-                            )}
-                        </div>
-
-                        {/* Top Services */}
-                        <div style={{
-                            background: 'var(--card-bg)',
-                            borderRadius: '10px',
-                            padding: '12px',
-                            border: '1px solid var(--border-color)',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-                        }}>
-                            <h3 style={{ fontWeight: 600, fontSize: '0.65rem', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <HeartPulse size={12} style={{ color: '#14B8A6' }} /> Top Services
-                            </h3>
-                            {stats.topServices.length > 0 ? (
-                                stats.topServices.slice(0, 3).map((service, index) => (
-                                    <div key={index} style={{
-                                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                        padding: '4px 8px',
-                                        background: index === 0 ? 'var(--primary-light)' : 'var(--bg-light)',
-                                        borderRadius: '4px',
-                                        marginBottom: '3px'
-                                    }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                            <span style={{ fontWeight: 700, fontSize: '0.5rem', color: index === 0 ? 'var(--primary-color)' : 'var(--text-muted)' }}>#{index + 1}</span>
-                                            <span style={{ fontWeight: 500, fontSize: '0.55rem' }}>{service.name}</span>
-                                        </div>
-                                        <div style={{ fontWeight: 600, fontSize: '0.55rem' }}>{formatCurrency(service.amount)}</div>
-                                    </div>
-                                ))
-                            ) : (
-                                <div style={{ textAlign: 'center', padding: '8px', color: 'var(--text-muted)', fontSize: '0.6rem' }}>No data</div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* ===== LIST VIEW - MOBILE ===== */}
+                    {/* ===== LIST VIEW (if viewMode is list) ===== */}
                     {viewMode === 'list' && (
                         <div style={{
                             background: 'var(--card-bg)',
-                            borderRadius: '10px',
-                            padding: '12px',
+                            borderRadius: '12px',
+                            padding: '16px',
                             border: '1px solid var(--border-color)',
                             boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
                             overflow: 'hidden',
-                            marginBottom: '12px'
+                            marginTop: '16px'
                         }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                <h3 style={{ fontWeight: 600, fontSize: '0.65rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <List size={12} style={{ color: 'var(--primary-color)' }} /> Invoices
-                                    <span style={{ fontSize: '0.5rem', color: 'var(--text-muted)' }}>({filteredInvoices.length})</span>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                <h3 style={{ fontWeight: 600, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <List size={16} style={{ color: 'var(--primary-color)' }} /> All Invoices
+                                    <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>({filteredInvoices.length})</span>
                                 </h3>
                             </div>
                             <div style={{ overflowX: 'auto' }}>
-                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.55rem', minWidth: '400px' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.65rem', minWidth: '500px' }}>
                                     <thead>
                                         <tr style={{ background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>
-                                            <th style={{ padding: '3px 4px', textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)', fontSize: '0.45rem', textTransform: 'uppercase' }}>Invoice</th>
-                                            <th style={{ padding: '3px 4px', textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)', fontSize: '0.45rem', textTransform: 'uppercase' }}>Patient</th>
-                                            <th style={{ padding: '3px 4px', textAlign: 'right', fontWeight: 600, color: 'var(--text-secondary)', fontSize: '0.45rem', textTransform: 'uppercase' }}>Amount</th>
-                                            <th style={{ padding: '3px 4px', textAlign: 'center', fontWeight: 600, color: 'var(--text-secondary)', fontSize: '0.45rem', textTransform: 'uppercase' }}>Status</th>
+                                            <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)', fontSize: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Invoice</th>
+                                            <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)', fontSize: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Patient</th>
+                                            <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--text-secondary)', fontSize: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Amount</th>
+                                            <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, color: 'var(--text-secondary)', fontSize: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Status</th>
+                                            <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, color: 'var(--text-secondary)', fontSize: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Method</th>
+                                            <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, color: 'var(--text-secondary)', fontSize: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Date</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {filteredInvoices.slice(0, 10).map((inv, index) => (
-                                            <tr key={inv.id} style={{ borderBottom: index < Math.min(filteredInvoices.length, 10) - 1 ? '1px solid var(--border-color)' : 'none' }}>
-                                                <td style={{ padding: '3px 4px', fontWeight: 500, fontSize: '0.5rem' }}>{inv.invoice_number}</td>
-                                                <td style={{ padding: '3px 4px', fontSize: '0.5rem' }}>{inv.patient?.name || inv.patient_name || 'N/A'}</td>
-                                                <td style={{ padding: '3px 4px', textAlign: 'right', fontWeight: 600, fontSize: '0.5rem' }}>{formatCurrency(inv.total || 0)}</td>
-                                                <td style={{ padding: '3px 4px', textAlign: 'center' }}>
-                                                    <span className={`hms-badge ${getStatusBadgeClass(inv.status)}`} style={{ fontSize: '0.4rem', padding: '1px 4px' }}>{inv.status}</span>
+                                        {filteredInvoices.slice(0, 15).map((inv, index) => (
+                                            <tr key={inv.id} style={{ borderBottom: index < Math.min(filteredInvoices.length, 15) - 1 ? '1px solid var(--border-color)' : 'none' }}>
+                                                <td style={{ padding: '8px 12px', fontWeight: 500, fontSize: '0.6rem' }}>{inv.invoice_number}</td>
+                                                <td style={{ padding: '8px 12px', fontSize: '0.6rem' }}>{inv.patient?.name || inv.patient_name || 'N/A'}</td>
+                                                <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, fontSize: '0.6rem' }}>{formatCurrency(inv.total || 0)}</td>
+                                                <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                                                    <span className={`hms-badge ${getStatusBadgeClass(inv.status)}`} style={{ fontSize: '0.5rem', padding: '2px 8px' }}>{inv.status}</span>
                                                 </td>
+                                                <td style={{ padding: '8px 12px', textAlign: 'center', fontSize: '0.55rem' }}>{inv.payment_method || 'N/A'}</td>
+                                                <td style={{ padding: '8px 12px', textAlign: 'center', fontSize: '0.55rem' }}>{new Date(inv.created_at).toLocaleDateString()}</td>
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
                             </div>
-                        </div>
-                    )}
-
-                    {/* ===== REPORT TYPE SECTIONS - MOBILE ===== */}
-                    {reportType !== 'all' && (
-                        <div style={{ marginTop: '12px', animation: 'slideUp 0.3s ease-out' }}>
-                            {reportType === 'financial' && (
-                                <div style={{ background: 'var(--card-bg)', borderRadius: '10px', padding: '12px', border: '1px solid var(--border-color)' }}>
-                                    <h3 style={{ fontWeight: 600, fontSize: '0.7rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        <DollarSign size={14} style={{ color: '#10B981' }} /> Financial
-                                    </h3>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                                        {[
-                                            { label: 'Revenue', value: formatCurrency(stats.totalRevenue), color: '#10B981', icon: '💰' },
-                                            { label: 'Pending', value: formatCurrency(stats.pendingRevenue), color: '#EF4444', icon: '⏳' },
-                                            { label: 'Paid', value: stats.paidInvoices, color: '#3B82F6', icon: '✅' },
-                                            { label: 'Collection', value: `${stats.collectionRate.toFixed(1)}%`, color: '#8B5CF6', icon: '📊' },
-                                        ].map((item, i) => (
-                                            <div key={i} style={{ padding: '6px 8px', background: 'var(--bg-light)', borderRadius: '4px', borderLeft: `2px solid ${item.color}` }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                    <span style={{ fontSize: '0.7rem' }}>{item.icon}</span>
-                                                    <div>
-                                                        <div style={{ fontSize: '0.45rem', color: 'var(--text-muted)' }}>{item.label}</div>
-                                                        <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-primary)' }}>{item.value}</div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {reportType === 'patients' && (
-                                <div style={{ background: 'var(--card-bg)', borderRadius: '10px', padding: '12px', border: '1px solid var(--border-color)' }}>
-                                    <h3 style={{ fontWeight: 600, fontSize: '0.7rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        <Users size={14} style={{ color: '#3B82F6' }} /> Patients
-                                    </h3>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                                        {[
-                                            { label: 'Total', value: stats.totalPatients, color: '#10B981', icon: '👤' },
-                                            { label: 'New', value: `+${stats.newPatients}`, color: '#3B82F6', icon: '✨' },
-                                            { label: 'Active', value: stats.activePatients, color: '#F59E0B', icon: '🟢' },
-                                            { label: 'Gender', value: `👨 ${stats.malePatients} 👩 ${stats.femalePatients}`, color: '#8B5CF6', icon: '👥' },
-                                        ].map((item, i) => (
-                                            <div key={i} style={{ padding: '6px 8px', background: 'var(--bg-light)', borderRadius: '4px', borderLeft: `2px solid ${item.color}` }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                    <span style={{ fontSize: '0.7rem' }}>{item.icon}</span>
-                                                    <div>
-                                                        <div style={{ fontSize: '0.45rem', color: 'var(--text-muted)' }}>{item.label}</div>
-                                                        <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-primary)' }}>{item.value}</div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {reportType === 'appointments' && (
-                                <div style={{ background: 'var(--card-bg)', borderRadius: '10px', padding: '12px', border: '1px solid var(--border-color)' }}>
-                                    <h3 style={{ fontWeight: 600, fontSize: '0.7rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        <Calendar size={14} style={{ color: '#8B5CF6' }} /> Appointments
-                                    </h3>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                                        {[
-                                            { label: 'Total', value: stats.totalAppointments, color: '#10B981', icon: '📋' },
-                                            { label: 'Completed', value: stats.completedAppointments, color: '#3B82F6', icon: '✅' },
-                                            { label: 'Upcoming', value: stats.upcomingAppointments, color: '#F59E0B', icon: '📅' },
-                                            { label: 'Cancelled', value: stats.cancelledAppointments, color: '#EF4444', icon: '❌' },
-                                        ].map((item, i) => (
-                                            <div key={i} style={{ padding: '6px 8px', background: 'var(--bg-light)', borderRadius: '4px', borderLeft: `2px solid ${item.color}` }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                    <span style={{ fontSize: '0.7rem' }}>{item.icon}</span>
-                                                    <div>
-                                                        <div style={{ fontSize: '0.45rem', color: 'var(--text-muted)' }}>{item.label}</div>
-                                                        <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-primary)' }}>{item.value}</div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <div style={{ marginTop: '4px', fontSize: '0.5rem', color: 'var(--text-muted)', textAlign: 'center' }}>
-                                        Completion: <strong>{stats.totalAppointments > 0 ? ((stats.completedAppointments / stats.totalAppointments) * 100).toFixed(1) : 0}%</strong>
-                                    </div>
-                                </div>
-                            )}
-
-                            {reportType === 'doctors' && (
-                                <div style={{ background: 'var(--card-bg)', borderRadius: '10px', padding: '12px', border: '1px solid var(--border-color)' }}>
-                                    <h3 style={{ fontWeight: 600, fontSize: '0.7rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        <Stethoscope size={14} style={{ color: '#EC4899' }} /> Doctors
-                                    </h3>
-                                    <div style={{ overflowX: 'auto' }}>
-                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.5rem', minWidth: '200px' }}>
-                                            <thead>
-                                                <tr style={{ background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>
-                                                    <th style={{ padding: '3px 6px', textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)', fontSize: '0.4rem' }}>Doctor</th>
-                                                    <th style={{ padding: '3px 6px', textAlign: 'right', fontWeight: 600, color: 'var(--text-secondary)', fontSize: '0.4rem' }}>Revenue</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {stats.revenueByDoctor.length > 0 ? (
-                                                    stats.revenueByDoctor.slice(0, 5).map((doc, index) => (
-                                                        <tr key={index} style={{ borderBottom: index < Math.min(stats.revenueByDoctor.length, 5) - 1 ? '1px solid var(--border-color)' : 'none' }}>
-                                                            <td style={{ padding: '3px 6px', fontWeight: 500 }}>{doc.name}</td>
-                                                            <td style={{ padding: '3px 6px', textAlign: 'right', fontWeight: 600 }}>{formatCurrency(doc.amount)}</td>
-                                                        </tr>
-                                                    ))
-                                                ) : (
-                                                    <tr><td colSpan="2" style={{ textAlign: 'center', padding: '8px', color: 'var(--text-muted)' }}>No data</td></tr>
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            )}
-
-                            {reportType === 'pharmacy' && (
-                                <div style={{ background: 'var(--card-bg)', borderRadius: '10px', padding: '12px', border: '1px solid var(--border-color)' }}>
-                                    <h3 style={{ fontWeight: 600, fontSize: '0.7rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        <Package size={14} style={{ color: '#14B8A6' }} /> Pharmacy
-                                    </h3>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                                        {[
-                                            { label: 'Total', value: stats.totalMedicines, color: '#10B981', icon: '💊' },
-                                            { label: 'Low Stock', value: stats.lowStockMedicines, color: '#F59E0B', icon: '⚠️' },
-                                            { label: 'Out of Stock', value: stats.outOfStockMedicines, color: '#EF4444', icon: '🚫' },
-                                            { label: 'Inventory Value', value: formatCurrency(stats.totalInventoryValue), color: '#8B5CF6', icon: '💰' },
-                                        ].map((item, i) => (
-                                            <div key={i} style={{ padding: '6px 8px', background: 'var(--bg-light)', borderRadius: '4px', borderLeft: `2px solid ${item.color}` }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                    <span style={{ fontSize: '0.7rem' }}>{item.icon}</span>
-                                                    <div>
-                                                        <div style={{ fontSize: '0.45rem', color: 'var(--text-muted)' }}>{item.label}</div>
-                                                        <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-primary)' }}>{item.value}</div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     )}
                 </div>
@@ -1638,11 +2638,12 @@ const Reports = () => {
                 @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
                 @keyframes slideDown { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
                 @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+                @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
                 
                 .hms-badge {
-                    padding: 1px 6px;
-                    border-radius: 12px;
-                    font-size: 0.5rem;
+                    padding: 2px 10px;
+                    borderRadius: 12px;
+                    font-size: 0.55rem;
                     font-weight: 600;
                     display: inline-block;
                 }
@@ -1652,7 +2653,21 @@ const Reports = () => {
                 .hms-badge.info { background: #DBEAFE; color: #2563EB; }
                 .hms-badge.secondary { background: #F3F4F6; color: #6B7280; }
 
+                @media (max-width: 1200px) {
+                    .grid-cols-4 { grid-template-columns: repeat(2, 1fr) !important; }
+                    .grid-cols-6 { grid-template-columns: repeat(3, 1fr) !important; }
+                }
+
+                @media (max-width: 768px) {
+                    .grid-cols-4 { grid-template-columns: repeat(2, 1fr) !important; }
+                    .grid-cols-6 { grid-template-columns: repeat(3, 1fr) !important; }
+                    .grid-cols-2 { grid-template-columns: 1fr !important; }
+                    .tab-label { display: none; }
+                }
+
                 @media (max-width: 480px) {
+                    .grid-cols-4 { grid-template-columns: 1fr !important; }
+                    .grid-cols-6 { grid-template-columns: repeat(2, 1fr) !important; }
                     .stat-value { font-size: 0.8rem; }
                 }
 

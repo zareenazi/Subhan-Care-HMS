@@ -134,7 +134,7 @@ const Staff = () => {
         navigate(-1);
     };
 
-    // ===== LOAD STAFF - FIXED: PROPERLY LOADS DOCTORS =====
+    // ===== LOAD STAFF - SIMPLIFIED VERSION =====
     const loadStaff = async () => {
         setLoading(true);
         setErrorMsg('');
@@ -199,17 +199,15 @@ const Staff = () => {
             // =============================================
             let combinedStaff = [];
 
-            // Create a Set to track existing staff names (case insensitive)
-            const existingNames = new Set();
+            // Create a Set to track existing staff
             const existingEmails = new Set();
+            const existingNames = new Set();
 
             // First, add all staff from staff table
             if (staffData) {
                 staffData.forEach(item => {
-                    existingNames.add(item.name?.toLowerCase());
-                    if (item.email) {
-                        existingEmails.add(item.email.toLowerCase());
-                    }
+                    if (item.email) existingEmails.add(item.email.toLowerCase());
+                    if (item.name) existingNames.add(item.name.toLowerCase());
                     combinedStaff.push({
                         ...item,
                         _table: 'staff'
@@ -220,11 +218,13 @@ const Staff = () => {
             // Then, add doctors that are not already in staff
             if (doctorsData && doctorsData.length > 0) {
                 doctorsData.forEach(doc => {
-                    const nameExists = existingNames.has(doc.name?.toLowerCase());
                     const emailExists = doc.email ? existingEmails.has(doc.email.toLowerCase()) : false;
+                    const nameExists = doc.name ? existingNames.has(doc.name.toLowerCase()) : false;
 
-                    if (!nameExists && !emailExists) {
+                    if (!emailExists && !nameExists) {
                         console.log(`📝 Adding doctor to staff view: ${doc.name}`);
+                        if (doc.email) existingEmails.add(doc.email.toLowerCase());
+                        if (doc.name) existingNames.add(doc.name.toLowerCase());
                         combinedStaff.push({
                             id: doc.id,
                             _table: 'doctors',
@@ -263,6 +263,124 @@ const Staff = () => {
                 });
             }
 
+            // =============================================
+            // 4. LOAD AUTH USERS (Direct from Supabase Auth)
+            // =============================================
+            try {
+                // Try to get users from auth.users via admin API
+                const { data: { users }, error: authError } = await supabase.auth.admin.listUsers();
+
+                if (authError) {
+                    console.log('⚠️ Cannot access auth.users:', authError.message);
+                } else if (users && users.length > 0) {
+                    console.log('✅ Auth users loaded:', users.length, 'records');
+
+                    users.forEach(user => {
+                        const emailKey = user.email?.toLowerCase();
+                        const nameKey = user.user_metadata?.name?.toLowerCase() || user.email?.toLowerCase();
+
+                        // Check if user already exists in staff
+                        if (emailKey && !existingEmails.has(emailKey) && !existingNames.has(nameKey)) {
+                            console.log(`📝 Adding auth user to staff view: ${user.email}`);
+                            if (emailKey) existingEmails.add(emailKey);
+                            if (nameKey) existingNames.add(nameKey);
+
+                            combinedStaff.push({
+                                id: user.id,
+                                _table: 'auth',
+                                name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
+                                email: user.email || '',
+                                phone: user.user_metadata?.phone || '',
+                                cnic: user.user_metadata?.cnic || '',
+                                date_of_birth: user.user_metadata?.date_of_birth || '',
+                                gender: user.user_metadata?.gender || 'Male',
+                                role: user.user_metadata?.role || 'Staff',
+                                department: user.user_metadata?.department || '',
+                                specialization: user.user_metadata?.specialization || '',
+                                qualification: user.user_metadata?.qualification || '',
+                                experience: user.user_metadata?.experience || '',
+                                license_number: user.user_metadata?.license_number || '',
+                                address: user.user_metadata?.address || '',
+                                emergency_contact: user.user_metadata?.emergency_contact || '',
+                                emergency_phone: user.user_metadata?.emergency_phone || '',
+                                joining_date: user.user_metadata?.joining_date || (user.created_at ? new Date(user.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]),
+                                shift: user.user_metadata?.shift || 'Morning',
+                                status: user.user_metadata?.status || 'Active',
+                                username: user.user_metadata?.username || user.email?.split('@')[0] || '',
+                                password: user.user_metadata?.password || 'User@123',
+                                salary: user.user_metadata?.salary || '',
+                                blood_group: user.user_metadata?.blood_group || '',
+                                religion: user.user_metadata?.religion || '',
+                                nationality: user.user_metadata?.nationality || '',
+                                created_at: user.created_at,
+                                updated_at: user.updated_at
+                            });
+                        }
+                    });
+                }
+            } catch (authErr) {
+                console.log('⚠️ Auth users error:', authErr.message);
+            }
+
+            // =============================================
+            // 5. LOAD FROM CUSTOM USERS TABLE (if exists)
+            // =============================================
+            try {
+                const { data: customUsers, error: customError } = await supabase
+                    .from('users')
+                    .select('*');
+
+                if (customError) {
+                    console.log('⚠️ Custom users table not found:', customError.message);
+                } else if (customUsers && customUsers.length > 0) {
+                    console.log('✅ Custom users loaded:', customUsers.length, 'records');
+
+                    customUsers.forEach(user => {
+                        const emailKey = user.email?.toLowerCase();
+                        const nameKey = user.name?.toLowerCase();
+
+                        if (emailKey && !existingEmails.has(emailKey) && !existingNames.has(nameKey)) {
+                            console.log(`📝 Adding custom user to staff view: ${user.email}`);
+                            if (emailKey) existingEmails.add(emailKey);
+                            if (nameKey) existingNames.add(nameKey);
+
+                            combinedStaff.push({
+                                id: user.id,
+                                _table: 'users',
+                                name: user.name || user.email?.split('@')[0] || 'User',
+                                email: user.email || '',
+                                phone: user.phone || '',
+                                cnic: user.cnic || '',
+                                date_of_birth: user.date_of_birth || '',
+                                gender: user.gender || 'Male',
+                                role: user.role || 'Staff',
+                                department: user.department || '',
+                                specialization: user.specialization || '',
+                                qualification: user.qualification || '',
+                                experience: user.experience || '',
+                                license_number: user.license_number || '',
+                                address: user.address || '',
+                                emergency_contact: user.emergency_contact || '',
+                                emergency_phone: user.emergency_phone || '',
+                                joining_date: user.joining_date || (user.created_at ? new Date(user.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]),
+                                shift: user.shift || 'Morning',
+                                status: user.status || 'Active',
+                                username: user.username || user.email?.split('@')[0] || '',
+                                password: user.password || 'User@123',
+                                salary: user.salary || '',
+                                blood_group: user.blood_group || '',
+                                religion: user.religion || '',
+                                nationality: user.nationality || '',
+                                created_at: user.created_at,
+                                updated_at: user.updated_at
+                            });
+                        }
+                    });
+                }
+            } catch (customErr) {
+                console.log('⚠️ Custom users error:', customErr.message);
+            }
+
             // Sort by name
             combinedStaff.sort((a, b) => a.name?.localeCompare(b.name) || 0);
 
@@ -271,7 +389,8 @@ const Staff = () => {
             const onLeaveCount = combinedStaff.filter(s => s.status === 'On Leave').length;
             const inactiveCount = combinedStaff.filter(s => s.status === 'Inactive').length;
 
-            console.log(`✅ Total combined staff: ${combinedStaff.length} (Staff: ${staffData?.length || 0}, Doctors: ${doctorsData?.length || 0})`);
+            console.log(`✅ Total combined staff: ${combinedStaff.length}`);
+            console.log(`📊 Stats: Active=${activeCount}, OnLeave=${onLeaveCount}, Inactive=${inactiveCount}`);
 
             setStaff(combinedStaff);
             setTotalStaff(combinedStaff.length);
@@ -293,11 +412,19 @@ const Staff = () => {
         }
     };
 
+    // ===== INITIAL LOAD =====
     useEffect(() => {
         loadStaff();
+    }, []);
+
+    // ===== RE-LOAD WHEN FILTERS CHANGE =====
+    useEffect(() => {
+        if (searchQuery !== '' || roleFilter !== '' || statusFilter !== '' || departmentFilter !== '') {
+            loadStaff();
+        }
     }, [searchQuery, roleFilter, statusFilter, departmentFilter]);
 
-    // Listen for staff changes from other components
+    // ===== LISTEN FOR STAFF CHANGES =====
     useEffect(() => {
         const handleStaffChange = () => {
             console.log('📢 Staff changed event received, reloading...');
@@ -839,6 +966,76 @@ const Staff = () => {
                     }
                 }
 
+            } else if (selectedStaff._table === 'auth' || selectedStaff._table === 'users') {
+                // Update staff table (since auth users might not be directly editable)
+                const staffUpdateData = {
+                    name: formData.name.trim(),
+                    email: formData.email ? formData.email.trim() : null,
+                    phone: formData.phone.trim(),
+                    cnic: formData.cnic || null,
+                    date_of_birth: formData.date_of_birth || null,
+                    gender: formData.gender || null,
+                    role: formData.role,
+                    department: formData.department || null,
+                    specialization: formData.specialization || null,
+                    qualification: formData.qualification || null,
+                    experience: formData.experience || null,
+                    license_number: formData.license_number || null,
+                    address: formData.address || null,
+                    emergency_contact: formData.emergency_contact || null,
+                    emergency_phone: formData.emergency_phone || null,
+                    joining_date: formData.joining_date || null,
+                    shift: formData.shift || null,
+                    status: formData.status || 'Active',
+                    username: formData.username.trim(),
+                    salary: formData.salary || null,
+                    blood_group: formData.blood_group || null,
+                    religion: formData.religion || null,
+                    nationality: formData.nationality || null,
+                    updated_at: new Date().toISOString()
+                };
+
+                if (formData.password) {
+                    staffUpdateData.password = formData.password;
+                }
+
+                // Check if user exists in staff table
+                const { data: existingStaff, error: checkError } = await supabase
+                    .from('staff')
+                    .select('id')
+                    .eq('email', selectedStaff.email)
+                    .single();
+
+                if (checkError || !existingStaff) {
+                    // Insert new staff record
+                    const { error: staffInsertError } = await supabase
+                        .from('staff')
+                        .insert([{
+                            ...staffUpdateData,
+                            created_at: new Date().toISOString()
+                        }]);
+
+                    if (staffInsertError) {
+                        console.error('Staff Insert Error:', staffInsertError);
+                        setErrorMsg(staffInsertError.message || 'Failed to update staff.');
+                        setActionLoading(false);
+                        return;
+                    }
+                } else {
+                    // Update existing staff
+                    const { error: staffUpdateError } = await supabase
+                        .from('staff')
+                        .update(staffUpdateData)
+                        .eq('id', existingStaff.id);
+
+                    if (staffUpdateError) {
+                        console.error('Staff Update Error:', staffUpdateError);
+                        setErrorMsg(staffUpdateError.message || 'Failed to update staff.');
+                        setActionLoading(false);
+                        return;
+                    }
+                }
+
             } else {
                 // Update staff table
                 if (formData.username !== selectedStaff.username) {
@@ -983,6 +1180,7 @@ const Staff = () => {
                     .delete()
                     .eq('name', selectedStaff.name)
                     .eq('role', 'Doctor');
+
             } else {
                 // Delete from staff table
                 const { error } = await supabase
@@ -1737,6 +1935,26 @@ const Staff = () => {
                                                                     (Doctor)
                                                                 </span>
                                                             )}
+                                                            {member._table === 'auth' && (
+                                                                <span style={{
+                                                                    fontSize: '0.6rem',
+                                                                    color: 'var(--text-muted)',
+                                                                    marginLeft: '4px',
+                                                                    fontWeight: 400
+                                                                }}>
+                                                                    (Auth)
+                                                                </span>
+                                                            )}
+                                                            {member._table === 'users' && (
+                                                                <span style={{
+                                                                    fontSize: '0.6rem',
+                                                                    color: 'var(--text-muted)',
+                                                                    marginLeft: '4px',
+                                                                    fontWeight: 400
+                                                                }}>
+                                                                    (User)
+                                                                </span>
+                                                            )}
                                                         </div>
                                                         <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                                                             @{member.username || member.email?.split('@')[0] || 'N/A'}
@@ -1804,9 +2022,8 @@ const Staff = () => {
                 )}
             </div>
 
-            {/* ============================================================ */}
-            {/* ===== ADD STAFF MODAL ===== */}
-            {/* ============================================================ */}
+            {/* ===== MODALS (Same as before) ===== */}
+            {/* Add Modal */}
             {isAddOpen && (
                 <div className="hms-modal-backdrop" onClick={() => setIsAddOpen(false)}>
                     <div className="hms-modal" onClick={(e) => e.stopPropagation()} style={{
@@ -2287,9 +2504,7 @@ const Staff = () => {
                 </div>
             )}
 
-            {/* ============================================================ */}
-            {/* ===== VIEW STAFF MODAL ===== */}
-            {/* ============================================================ */}
+            {/* View Modal */}
             {isViewOpen && selectedStaff && (
                 <div className="hms-modal-backdrop" onClick={() => setIsViewOpen(false)}>
                     <div className="hms-modal" onClick={(e) => e.stopPropagation()} style={{
@@ -2674,9 +2889,7 @@ const Staff = () => {
                 </div>
             )}
 
-            {/* ============================================================ */}
-            {/* ===== EDIT STAFF MODAL ===== */}
-            {/* ============================================================ */}
+            {/* Edit Modal */}
             {isEditOpen && selectedStaff && (
                 <div className="hms-modal-backdrop" onClick={() => setIsEditOpen(false)}>
                     <div className="hms-modal" onClick={(e) => e.stopPropagation()} style={{
@@ -3156,9 +3369,7 @@ const Staff = () => {
                 </div>
             )}
 
-            {/* ============================================================ */}
-            {/* ===== DELETE CONFIRMATION MODAL ===== */}
-            {/* ============================================================ */}
+            {/* Delete Modal */}
             {isDeleteOpen && (
                 <div className="hms-modal-backdrop" onClick={() => setIsDeleteOpen(false)}>
                     <div className="hms-modal small" onClick={(e) => e.stopPropagation()} style={{

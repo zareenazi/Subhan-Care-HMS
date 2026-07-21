@@ -70,7 +70,7 @@ const ForgotPassword = () => {
             name="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="e.g. doctor@subhancare.com"
+            placeholder="e.g. doctorsubhancare@gmail.com"
             icon={Mail}
             error={formErrors.email}
             disabled={isSubmitting}

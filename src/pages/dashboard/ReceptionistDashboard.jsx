@@ -15,8 +15,9 @@ import {
   Shield, Star, Award, CalendarDays as CalendarDaysIcon,
   Zap, Home, ArrowRight, Settings, Sparkles,
   ArrowLeft, AlertTriangle as AlertTriangleIcon,
-  UserCircle, HelpCircle, Appointment, Bed,
-  Pill as PillIcon, Clipboard as ClipboardIcon,
+  UserCircle, HelpCircle,
+  // ===== FIX: Appointment hata diya =====
+  Bed, Pill as PillIcon, Clipboard as ClipboardIcon,
   FileText as FileTextIcon, Users as UsersIcon
 } from 'lucide-react';
 import Sidebar from '../../components/Sidebar';

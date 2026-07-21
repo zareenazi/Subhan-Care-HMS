@@ -11,12 +11,13 @@ import {
     MapPin, Award, CreditCard, Briefcase, Building,
     Globe, Heart, BookOpen, DollarSign, Calendar as CalIcon,
     Hash, Target, Users as UsersIcon, MessageCircle,
-    // ===== FIXED ICONS =====
+    // ===== FIXED: All social media icons =====
     Share2,      // Twitter ki jagah
     Link2,       // Linkedin ki jagah
     Camera,      // Instagram ki jagah
     Play,        // Youtube ki jagah
-    Facebook,
+    // Facebook removed - use MessageCircle instead
+    MessageCircle as FacebookIcon,  // Ya koi aur icon
     Link2 as LinkIcon, File, Upload, Camera as CameraIcon, UserCheck,
     Shield, Key, Lock, Smartphone, Home, Hospital,
     Clipboard, Thermometer, Droplet, Scissors, Bone,
